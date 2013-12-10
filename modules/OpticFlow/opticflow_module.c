@@ -32,6 +32,7 @@
 
 // Paparazzi State: Attitude -> Vision
 #include "state.h" // for attitude
+#include "boards/ardrone/navdata.h" // for ultrasound Height
 
 // Threaded computer vision
 #include <pthread.h>
@@ -40,16 +41,14 @@
 struct UdpSocket *sock;
 struct gst2ppz_message_struct gst2ppz;
 struct ppz2gst_message_struct ppz2gst;
-//int obstacle_avoid_adjust_factor;
 
 
 void opticflow_module_init(void) {
-/*
+
   // Give unique ID's to messages TODO: check that received messages are correct (not from an incompatable gst plugin)
   ppz2gst.ID = 0x0003;
   gst2ppz.ID = 0x0004;
-  obstacle_avoid_adjust_factor = 5;
-
+  /*
   // Navigation Code
   init_avoid_navigation();
   */
@@ -59,32 +58,14 @@ void opticflow_module_init(void) {
 volatile uint8_t computervision_thread_has_results = 0;
 
 void opticflow_module_run(void) {
-/*
+
   // Send Attitude To GST Module
   struct Int32Eulers* att = stateGetNedToBodyEulers_i();
   ppz2gst.counter++; // 512 Hz
   ppz2gst.roll = att->phi;
   ppz2gst.pitch = att->theta;
-  ppz2gst.adjust_factor = obstacle_avoid_adjust_factor;
+  ppz2gst.alt = navdata_height();
 
-
-
-  // Read Latest GST Module Results
-  if (computervision_thread_has_results)
-  {
-    computervision_thread_has_results = 0;
-    run_avoid_navigation_onvision();
-  }
-  else
-  {
-    // Play annimation
-    static uint8_t nr = 0;
-    gst2ppz.obstacle_bins[nr] ++;
-    nr ++;
-    if (nr >= N_BINS)
-      nr = 0;
-  }
-  */
 }
 
 /////////////////////////////////////////////////////////////////////////
