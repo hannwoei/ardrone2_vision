@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "optic_flow.h"
+#include "optic_flow_gdc.h"
 
 #define int_index(x,y) (y * IMG_WIDTH + x)
 #define uint_index(xx, yy) (((yy * IMG_WIDTH + xx) * 2) & 0xFFFFFFFC)
