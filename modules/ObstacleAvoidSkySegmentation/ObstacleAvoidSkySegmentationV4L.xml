@@ -32,7 +32,7 @@ $(TARGET).srcs += $(DIR_CV)/trig.c
 $(TARGET).srcs += $(DIR_LIB)/udp/socket.c
 $(TARGET).srcs += $(DIR_LIB)/v4l/video.c
 $(TARGET).CFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread
-$(TARGET).LDFLAGS += -pthread -lrt
+$(TARGET).LDFLAGS += -pthread -lrt -static
 
 all:
 	make -C $(VISION_MODULE_FOLDER)/visionresult/

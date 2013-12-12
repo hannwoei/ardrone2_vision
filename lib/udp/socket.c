@@ -28,8 +28,7 @@ struct UdpSocket* udp_socket(const char* str_ip_out, const int port_out, const i
   struct UdpSocket* me = malloc(sizeof(struct UdpSocket));
 
   int so_reuseaddr = 1;
-  struct protoent * pte = getprotobyname("UDP");
-  me->socket_out = socket( PF_INET, SOCK_DGRAM, pte->p_proto);
+  me->socket_out = socket( AF_INET, SOCK_DGRAM, 0);
   setsockopt(me->socket_out, SOL_SOCKET, SO_REUSEADDR,
              &so_reuseaddr, sizeof(so_reuseaddr));
 
@@ -38,15 +37,15 @@ struct UdpSocket* udp_socket(const char* str_ip_out, const int port_out, const i
     setsockopt(me->socket_out, SOL_SOCKET, SO_BROADCAST,
                &broadcast, sizeof(broadcast));
 
-  me->addr_out.sin_family = PF_INET;
+  me->addr_out.sin_family = AF_INET;
   me->addr_out.sin_port = htons(port_out);
   me->addr_out.sin_addr.s_addr = inet_addr(str_ip_out);
 
-  me->socket_in = socket( PF_INET, SOCK_DGRAM, pte->p_proto);
+  me->socket_in = socket( AF_INET, SOCK_DGRAM, 0);
   setsockopt(me->socket_in, SOL_SOCKET, SO_REUSEADDR,
              &so_reuseaddr, sizeof(so_reuseaddr));
 
-  me->addr_in.sin_family = PF_INET;
+  me->addr_in.sin_family = AF_INET;
   me->addr_in.sin_port = htons(port_in);
   me->addr_in.sin_addr.s_addr = htonl(INADDR_ANY);
 

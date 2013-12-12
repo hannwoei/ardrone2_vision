@@ -145,6 +145,7 @@ void my_plugin_run(unsigned char *frame)
 	float opt_trans_x = (float)tan_zelf(opt_angle_x)/1000.0*(float)mean_alt;
 	float opt_trans_y = (float)tan_zelf(opt_angle_y)/1000.0*(float)mean_alt;
 
+	//printf("dx = %f and dy = %f\n",opt_trans_x, opt_trans_y);
 	//g_print("%f;%f;%f;%f;%f;%f;%d;%f;%f\n",opt_angle_x+diff_roll,diff_roll,opt_angle_x,opt_angle_y+diff_pitch,diff_pitch,opt_angle_y,mean_alt,opt_trans_x,opt_trans_y);
 
 
