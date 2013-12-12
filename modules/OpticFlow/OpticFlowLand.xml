@@ -24,6 +24,7 @@ VISION_MODULE_FOLDER = $(DIR_MODULES)/OpticFlow
 
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
+$(TARGET).srcs += $(VISION_MODULE_FOLDER)/land_guidance.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/optic_flow_gdc.c
 $(TARGET).srcs += $(DIR_CV)/encoding/jpeg.c
 $(TARGET).srcs += $(DIR_CV)/encoding/rtp.c
