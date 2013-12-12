@@ -95,7 +95,7 @@ void opticflow_module_run(void) {
 // Payload Code
 #include "opticflow_code.h"
 
-#define DOWNLINK_VIDEO 1
+//#define DOWNLINK_VIDEO 1
 
 #ifdef DOWNLINK_VIDEO
 #include "encoding/jpeg.h"
@@ -112,9 +112,9 @@ void *computervision_thread_main(void* data)
 {
   // Video Input
   struct vid_struct vid;
-  vid.device = (char*)"/dev/video1";
-  vid.w=1280;
-  vid.h=720;
+  vid.device = (char*)"/dev/video2"; // video1 = front camera; video2 = bottom camera
+  vid.w=320; // front camera = 1280; bottom camera = 320
+  vid.h=240;  // front camera = 720; bottom camera = 240
   vid.n_buffers = 4;
   if (video_init(&vid)<0) {
     printf("Error initialising video\n");
@@ -126,7 +126,7 @@ void *computervision_thread_main(void* data)
   struct img_struct* img_new = video_create_image(&vid);
 
   // Video Resizing
-  #define DOWNSIZE_FACTOR   8
+  #define DOWNSIZE_FACTOR   1
   struct img_struct small;
   small.w = vid.w / DOWNSIZE_FACTOR;
   small.h = vid.h / DOWNSIZE_FACTOR;

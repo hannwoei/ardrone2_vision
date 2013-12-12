@@ -97,7 +97,7 @@ void run_opticflow_hover(void)
 
 void run_opticflow_land(void)
 {
-  // TODO:
+  // TODO: Using divergence flow for landing
 
 }
 

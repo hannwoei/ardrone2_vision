@@ -75,6 +75,8 @@ void my_plugin_run(unsigned char *frame)
 	int ONLY_STOPPED = 0;
 	error = findActiveCorners(frame, GRID_ROWS, ONLY_STOPPED, x, y, active, &n_found_points, mark_points,imgWidth,imgHeight);
 
+	//printf("error active corners = %d\n",error);
+	//printf("num_points = %d\n",n_found_points);
 	/*
 	//normal corner:
 	int suppression_distance_squared;
@@ -84,72 +86,73 @@ void my_plugin_run(unsigned char *frame)
 
 	if(error == 0)
 	{
-	error = opticFlowLK(frame, old_img, x, y, n_found_points, imgWidth, imgHeight, new_x, new_y, status, 5, MAX_POINTS);
+		error = opticFlowLK(frame, old_img, x, y, n_found_points, imgWidth, imgHeight, new_x, new_y, status, 5, MAX_POINTS);
+
+		//printf("error optic flow = %d\n",error);
+
+		//calculate roll and pitch diff:
+		float diff_roll = (float)(current_roll- old_roll)/36.0; // 72 factor is to convert to degrees
+		float diff_pitch = (float)(current_pitch- old_pitch)/36.0;
+
+		//calculate mean altitude between the to samples:
+		int mean_alt;
+		if (current_alt>old_alt)
+			mean_alt = (current_alt-old_alt)/2 + old_alt;
+		else
+			mean_alt = (old_alt-current_alt)/2 + current_alt;
 
 
-	//calculate roll and pitch diff:
-	float diff_roll = (float)(current_roll- old_roll)/36.0; // 72 factor is to convert to degrees
-	float diff_pitch = (float)(current_pitch- old_pitch)/36.0;
+		//remember the frame and meta info
+		memcpy(old_img,frame,imgHeight*imgWidth*2);
+		old_pitch = current_pitch;
+		old_roll = current_roll;
+		old_alt = current_alt;
 
-	//calculate mean altitude between the to samples:
-	int mean_alt;
-	if (current_alt>old_alt)
-	mean_alt = (current_alt-old_alt)/2 + old_alt;
-	else
-	mean_alt = (old_alt-current_alt)/2 + current_alt;
+		if(error == 0)
+		{
+			showFlow(frame, x, y, status, n_found_points, new_x, new_y, imgWidth, imgHeight);
 
+			int tot_x=0;
+			int tot_y=0;
+			for (int i=0; i<n_found_points;i++) {
+				tot_x = tot_x+(new_x[i]-x[i]);
+				tot_y = tot_y+(new_y[i]-y[i]);
+			}
 
-	//remember the frame and meta info
-	memcpy(old_img,frame,imgHeight*imgWidth*2);
-	old_pitch = current_pitch;
-	old_roll = current_roll;
-	old_alt = current_alt;
+			//convert pixels/frame to degrees/frame
+			float scalef = 64.0/400.0; //64 is vertical camera diagonal view angle (sqrt(320²+240²)=400)
+			float opt_angle_x = tot_x*scalef; //= (tot_x/imgWidth) * (scalef*imgWidth); //->degrees/frame
+			float opt_angle_y = tot_y*scalef;
 
+			if (abs(opt_angle_x-opt_angle_x_prev)> 3.0) {
+				opt_angle_x = opt_angle_x_prev;
+			} else	{
+				opt_angle_x_prev = opt_angle_x;
+			}
 
+			if (abs(opt_angle_y-opt_angle_y_prev)> 3.0) {
+				opt_angle_y = opt_angle_y_prev;
+			} else	{
+				opt_angle_y_prev = opt_angle_y;
+			}
 
-	if(error == 0)
-	{
-	showFlow(frame, x, y, status, n_found_points, new_x, new_y, imgWidth, imgHeight);
+			//g_print("Opt_angle x: %f, diff_roll: %d; result: %f. Opt_angle_y: %f, diff_pitch: %d; result: %f. Height: %d\n",opt_angle_x,diff_roll,opt_angle_x-diff_roll,opt_angle_y,diff_pitch,opt_angle_y-diff_pitch,mean_alt);
 
-	int tot_x=0;
-	int tot_y=0;
-	for (int i=0; i<n_found_points;i++) {
-	tot_x = tot_x+(new_x[i]-x[i]);
-	tot_y = tot_y+(new_y[i]-y[i]);
-	}
+			//compensate optic flow for attitude (roll,pitch) change:
+			opt_angle_x -=  diff_roll;
+			opt_angle_y -= diff_pitch;
 
-	//convert pixels/frame to degrees/frame
-	float scalef = 64.0/400.0; //64 is vertical camera diagonal view angle (sqrt(320²+240²)=400)
-	float opt_angle_x = tot_x*scalef; //= (tot_x/imgWidth) * (scalef*imgWidth); //->degrees/frame
-	float opt_angle_y = tot_y*scalef;
-
-	if (abs(opt_angle_x-opt_angle_x_prev)> 3.0) {
-	opt_angle_x = opt_angle_x_prev;
-	} else	{
-	opt_angle_x_prev = opt_angle_x;
-	}
-
-	if (abs(opt_angle_y-opt_angle_y_prev)> 3.0) {
-	opt_angle_y = opt_angle_y_prev;
-	} else	{
-	opt_angle_y_prev = opt_angle_y;
-	}
-
-	//g_print("Opt_angle x: %f, diff_roll: %d; result: %f. Opt_angle_y: %f, diff_pitch: %d; result: %f. Height: %d\n",opt_angle_x,diff_roll,opt_angle_x-diff_roll,opt_angle_y,diff_pitch,opt_angle_y-diff_pitch,mean_alt);
-
-	//compensate optic flow for attitude (roll,pitch) change:
-	opt_angle_x -=  diff_roll;
-	opt_angle_y -= diff_pitch;
-
-	//calculate translation in cm/frame from optical flow in degrees/frame
-	float opt_trans_x = (float)tan_zelf(opt_angle_x)/1000.0*(float)mean_alt;
-	float opt_trans_y = (float)tan_zelf(opt_angle_y)/1000.0*(float)mean_alt;
-
-	//printf("dx = %f and dy = %f\n",opt_trans_x, opt_trans_y);
-	//g_print("%f;%f;%f;%f;%f;%f;%d;%f;%f\n",opt_angle_x+diff_roll,diff_roll,opt_angle_x,opt_angle_y+diff_pitch,diff_pitch,opt_angle_y,mean_alt,opt_trans_x,opt_trans_y);
+			//calculate translation in cm/frame from optical flow in degrees/frame
+			float opt_trans_x = (float)tan_zelf(opt_angle_x)/1000.0*(float)mean_alt;
+			float opt_trans_y = (float)tan_zelf(opt_angle_y)/1000.0*(float)mean_alt;
 
 
-	} //else g_print("error1\n");
+			//g_print("%f;%f;%f;%f;%f;%f;%d;%f;%f\n",opt_angle_x+diff_roll,diff_roll,opt_angle_x,opt_angle_y+diff_pitch,diff_pitch,opt_angle_y,mean_alt,opt_trans_x,opt_trans_y);
+//			printf("dx = %f, dy = %f, alt = %d, p = %f, q = %f\n", opt_trans_x, opt_trans_y, mean_alt, diff_roll, diff_pitch);
+			printf("dx_t = %f, dy_t = %f, dx = %f, dy = %f \n", opt_trans_x, opt_trans_y, opt_angle_x+diff_roll, opt_angle_y+diff_pitch );
+
+
+		} //else g_print("error1\n");
 	} //else g_print("error2\n");
 
 	free(x);
