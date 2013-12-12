@@ -28,7 +28,7 @@
 #include "video_message_structs.h"
 
 // Navigate Based On Vision
-//#include "avoid_navigation.h"
+#include "land_guidance.h"
 
 // Paparazzi State: Attitude -> Vision
 #include "state.h" // for attitude
@@ -48,10 +48,10 @@ void opticflow_module_init(void) {
   // Give unique ID's to messages TODO: check that received messages are correct (not from an incompatable gst plugin)
   ppz2gst.ID = 0x0003;
   gst2ppz.ID = 0x0004;
-  /*
-  // Navigation Code
-  init_avoid_navigation();
-  */
+
+  // Navigation Code Initialization
+  init_land_guidance();
+
 }
 
 
@@ -66,6 +66,23 @@ void opticflow_module_run(void) {
   ppz2gst.pitch = att->theta;
   ppz2gst.alt = navdata_height();
 
+  // Read Latest Vision Module Results
+  if (computervision_thread_has_results)
+  {
+    computervision_thread_has_results = 0;
+    run_land_guidance_onvision();
+  }
+/*
+  else
+  {
+    // Play annimation
+    static uint8_t nr = 0;
+    gst2ppz.obstacle_bins[nr] ++;
+    nr ++;
+    if (nr >= N_BINS)
+      nr = 0;
+  }
+  */
 }
 
 /////////////////////////////////////////////////////////////////////////
