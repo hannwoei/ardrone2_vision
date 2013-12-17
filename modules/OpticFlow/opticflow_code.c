@@ -12,9 +12,12 @@
 
 // Communication
 #include "video_message_structs.h"
-
 struct gst2ppz_message_struct gst2ppz;
 struct ppz2gst_message_struct ppz2gst;
+
+// Downlink
+#include "messages.h"
+#include "subsystems/datalink/downlink.h"
 
 //#include "paparazzi.h"
 
@@ -28,6 +31,8 @@ unsigned char * old_img;
 int old_pitch, old_roll, old_alt;
 float opt_angle_y_prev;
 float opt_angle_x_prev;
+float opt_trans_x;
+float opt_trans_y;
 
 // Called by plugin
 void my_plugin_init(void)
@@ -43,6 +48,8 @@ void my_plugin_init(void)
 	old_alt = 0;
 	opt_angle_y_prev = 0;
 	opt_angle_x_prev = 0;
+	opt_trans_x = 0;
+	opt_trans_y = 0;
 
 	gst2ppz.counter = 0;
 
@@ -91,8 +98,8 @@ void my_plugin_run(unsigned char *frame)
 		//printf("error optic flow = %d\n",error);
 
 		//calculate roll and pitch diff:
-		float diff_roll = (float)(current_roll- old_roll)/36.0; // 72 factor is to convert to degrees
-		float diff_pitch = (float)(current_pitch- old_pitch)/36.0;
+		float diff_roll = (float)(current_roll- old_roll)/ 71.488686161687739470794373877294f; // 72 factor is to convert to degrees
+		float diff_pitch = (float)(current_pitch- old_pitch)/ 71.488686161687739470794373877294f; //previously it is divided by 36
 
 		//calculate mean altitude between the to samples:
 		int mean_alt;
@@ -110,7 +117,7 @@ void my_plugin_run(unsigned char *frame)
 
 		if(error == 0)
 		{
-			showFlow(frame, x, y, status, n_found_points, new_x, new_y, imgWidth, imgHeight);
+			//showFlow(frame, x, y, status, n_found_points, new_x, new_y, imgWidth, imgHeight);
 
 			int tot_x=0;
 			int tot_y=0;
@@ -124,13 +131,13 @@ void my_plugin_run(unsigned char *frame)
 			float opt_angle_x = tot_x*scalef; //= (tot_x/imgWidth) * (scalef*imgWidth); //->degrees/frame
 			float opt_angle_y = tot_y*scalef;
 
-			if (abs(opt_angle_x-opt_angle_x_prev)> 3.0) {
+			if (abs(opt_angle_x-opt_angle_x_prev)> 10.0) {
 				opt_angle_x = opt_angle_x_prev;
 			} else	{
 				opt_angle_x_prev = opt_angle_x;
 			}
 
-			if (abs(opt_angle_y-opt_angle_y_prev)> 3.0) {
+			if (abs(opt_angle_y-opt_angle_y_prev)> 10.0) {
 				opt_angle_y = opt_angle_y_prev;
 			} else	{
 				opt_angle_y_prev = opt_angle_y;
@@ -138,19 +145,22 @@ void my_plugin_run(unsigned char *frame)
 
 			//g_print("Opt_angle x: %f, diff_roll: %d; result: %f. Opt_angle_y: %f, diff_pitch: %d; result: %f. Height: %d\n",opt_angle_x,diff_roll,opt_angle_x-diff_roll,opt_angle_y,diff_pitch,opt_angle_y-diff_pitch,mean_alt);
 
+			//raw optic flow (for telemetry purpose)
+			float opt_angle_x_raw = opt_angle_x;
+			float opt_angle_y_raw = opt_angle_y;
+
 			//compensate optic flow for attitude (roll,pitch) change:
 			opt_angle_x -=  diff_roll;
 			opt_angle_y -= diff_pitch;
 
 			//calculate translation in cm/frame from optical flow in degrees/frame
-			float opt_trans_x = (float)tan_zelf(opt_angle_x)/1000.0*(float)mean_alt;
-			float opt_trans_y = (float)tan_zelf(opt_angle_y)/1000.0*(float)mean_alt;
-
+			opt_trans_x = (float)tan_zelf(opt_angle_x)/1000.0*(float)mean_alt;
+			opt_trans_y = (float)tan_zelf(opt_angle_y)/1000.0*(float)mean_alt;
 
 			//g_print("%f;%f;%f;%f;%f;%f;%d;%f;%f\n",opt_angle_x+diff_roll,diff_roll,opt_angle_x,opt_angle_y+diff_pitch,diff_pitch,opt_angle_y,mean_alt,opt_trans_x,opt_trans_y);
 //			printf("dx = %f, dy = %f, alt = %d, p = %f, q = %f\n", opt_trans_x, opt_trans_y, mean_alt, diff_roll, diff_pitch);
-			printf("dx_t = %f, dy_t = %f, dx = %f, dy = %f \n", opt_trans_x, opt_trans_y, opt_angle_x+diff_roll, opt_angle_y+diff_pitch );
-
+//			printf("dx_t = %f, dy_t = %f, dx = %f, dy = %f \n", opt_trans_x, opt_trans_y, opt_angle_x+diff_roll, opt_angle_y+diff_pitch );
+			DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &n_found_points);
 
 		} //else g_print("error1\n");
 	} //else g_print("error2\n");

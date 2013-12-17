@@ -55,9 +55,9 @@ void *computervision_thread_main(void* data)
 {
   // Video Input
   struct vid_struct vid;
-  vid.device = (char*)"/dev/video1";
-  vid.w=1280;
-  vid.h=720;
+  vid.device = (char*)"/dev/video1"; // video1 = front camera; video2 = bottom camera
+  vid.w=1280; // front camera = 1280; bottom camera = 320
+  vid.h=720;  // front camera = 720; bottom camera = 240
   vid.n_buffers = 4;
   if (video_init(&vid)<0) {
     printf("Error initialising video\n");

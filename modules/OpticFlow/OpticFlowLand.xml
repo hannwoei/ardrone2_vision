@@ -11,7 +11,7 @@
 
   <init fun="opticflow_module_init()"/>
 
-  <periodic fun="opticflow_module_run()" freq="200" start="opticflow_module_start()" stop="opticflow_module_stop()" autorun="TRUE"/>
+  <periodic fun="opticflow_module_run()" freq="200" start="opticflow_module_start()" stop="opticflow_module_stop()" autorun="FALSE"/>
   <makefile>
     <define name="ARDRONE_VIDEO_PORT" value="2002" />
     <define name="USE_ARDRONE_VIDEO" />  

@@ -7,6 +7,8 @@ extern unsigned int imgWidth, imgHeight;
 extern unsigned int tcp_port;
 extern unsigned int adjust_factor;
 extern unsigned int verbose;
+extern float opt_trans_x;
+extern float opt_trans_y;
 
 // Called by plugin
 void my_plugin_init(void);
