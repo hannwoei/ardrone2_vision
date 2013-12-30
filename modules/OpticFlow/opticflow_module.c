@@ -37,6 +37,9 @@
 // Threaded computer vision
 #include <pthread.h>
 
+// FPS
+float FPS;
+int prev_time;
 
 struct UdpSocket *sock;
 struct gst2ppz_message_struct gst2ppz;
@@ -51,6 +54,10 @@ void opticflow_module_init(void) {
 
   // Navigation Code Initialization
   init_land_guidance();
+
+  // FPS
+/*  FPS = 0.0;
+  prev_time = 0;*/
 
 }
 
@@ -72,6 +79,7 @@ void opticflow_module_run(void) {
     computervision_thread_has_results = 0;
     run_land_guidance_onvision();
   }
+
 /*
   else
   {
@@ -157,6 +165,18 @@ void *computervision_thread_main(void* data)
 
     // Resize: device by 4
     resize_uyuv(img_new, &small, DOWNSIZE_FACTOR);
+
+	// FPS:
+/*	clock_t curr_time = clock();
+	if(prev_time != 0)
+	{
+		float delta_t = (float) (curr_time - prev_time) / CLOCKS_PER_SEC;
+		float ratio = 0.5;
+		FPS = ((float)(ratio * FPS + (1-ratio) * (1.0f / (float) delta_t)));
+		//printf("\nFPS OF = %f\n", FPS);
+	}
+	printf("previous = %d,current = %d, FPS = %f\n",prev_time, curr_time, FPS);
+	prev_time = curr_time;*/
 
     // Process
     my_plugin_run(small.buf);

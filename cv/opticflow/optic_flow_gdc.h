@@ -23,4 +23,13 @@ void getGradientPatch(int* Patch, int* DX, int* DY, int half_window_size);
 int getSumPatch(int* Patch, int size);
 void showFlow(unsigned char * frame_buf, int* x, int* y, int* status, int n_found_points, int* new_x, int* new_y, int imgW, int imgH);
 int opticFlowLK(unsigned char * new_image_buf, unsigned char * old_image_buf, int* p_x, int* p_y, int n_found_points, int imW, int imH, int* new_x, int* new_y, int* status, int half_window_size, int max_iterations);
+void MatMul(float* Mat1, float* Mat2, float* Mat3, int MatW, int MatH);
+void MatVVMul(float* MVec, float** Mat, float* Vec, int MatW, int MatH);
+void ScaleAdd(float* Mat3, float* Mat1, float Scale, float* Mat2, int MatW, int MatH);
+static float PYTHAG(float a, float b);
+int dsvd(int **a, int m, int n, float *w, float **v);
+void svbksb(float **u, float *w, float **v, int m, int n, int *b, float *x);
+void svdSolve(float *x_svd, float **u, int m, int n, int *b);
+void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold);
+void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS);
 #endif

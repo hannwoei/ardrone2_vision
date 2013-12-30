@@ -32,7 +32,8 @@
 
 // Settings
 //extern int obstacle_avoid_adjust_factor;
-
+/*extern float FPS;
+extern int prev_time;*/
 
 // Module functions
 extern void opticflow_module_init(void);
