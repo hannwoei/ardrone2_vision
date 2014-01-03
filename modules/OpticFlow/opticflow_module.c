@@ -39,12 +39,44 @@
 
 // FPS
 float FPS;
-int prev_time;
+clock_t prev_time;
+float delta_t;
+long timestamp;
 
 struct UdpSocket *sock;
 struct gst2ppz_message_struct gst2ppz;
 struct ppz2gst_message_struct ppz2gst;
 
+#define USEC_PER_SEC 1000000L
+//=== returns the number of usecs of (t2 - t1)
+
+long time_elapsed (struct timeval *t1, struct timeval *t2) {
+
+	long sec, usec;
+
+	sec = t2->tv_sec - t1->tv_sec;
+	usec = t2->tv_usec - t1->tv_usec;
+	if (usec < 0) {
+		--sec;
+		usec = usec + USEC_PER_SEC;
+	}
+	return sec*USEC_PER_SEC + usec;
+}
+
+struct timeval start_time;
+struct timeval end_time;
+
+void start_timer() {
+//	struct timezone tz;
+//	gettimeofday (&start_time, &tz);
+	gettimeofday (&start_time, NULL);
+}
+long end_timer() {
+//	struct timezone tz;
+//	gettimeofday (&end_time, &tz);
+	gettimeofday (&end_time, NULL);
+	return time_elapsed(&start_time, &end_time);
+}
 
 void opticflow_module_init(void) {
 
@@ -56,9 +88,11 @@ void opticflow_module_init(void) {
   init_land_guidance();
 
   // FPS
-/*  FPS = 0.0;
-  prev_time = 0;*/
-
+  FPS = 0.0;
+  prev_time = 0.0;
+  delta_t = 0.0;
+  timestamp=0;
+  start_timer();
 }
 
 
@@ -167,19 +201,25 @@ void *computervision_thread_main(void* data)
     resize_uyuv(img_new, &small, DOWNSIZE_FACTOR);
 
 	// FPS:
-/*	clock_t curr_time = clock();
+/*
+	clock_t curr_time = clock();
 	if(prev_time != 0)
 	{
-		float delta_t = (float) (curr_time - prev_time) / CLOCKS_PER_SEC;
-		float ratio = 0.5;
-		FPS = ((float)(ratio * FPS + (1-ratio) * (1.0f / (float) delta_t)));
-		//printf("\nFPS OF = %f\n", FPS);
+		delta_t = (curr_time - prev_time) / (float) CLOCKS_PER_SEC;
+		float ratio = 0.5; //time constant
+		FPS = ((ratio * FPS + (1-ratio) * (1.0f / delta_t))); // smoothed average
+//		FPS = 1.0f / (float) delta_t;
 	}
-	printf("previous = %d,current = %d, FPS = %f\n",prev_time, curr_time, FPS);
-	prev_time = curr_time;*/
+	//printf("previous = %d,current = %d, dt = %f, FPS = %f\n",prev_time, curr_time, delta_t, FPS);
+	prev_time = curr_time;
+*/
+    timestamp = end_timer();
+    FPS = (float) 1000000/(float)timestamp;
+//    printf("dt = %d, FPS = %f\n",timestamp, FPS);
+    start_timer();
 
     // Process
-    my_plugin_run(small.buf);
+    my_plugin_run(small.buf, FPS);
 
 #ifdef DOWNLINK_VIDEO
     // JPEG encode the image:

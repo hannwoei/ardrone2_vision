@@ -534,7 +534,6 @@ int findCorners(unsigned char *frame_buf, int MAX_POINTS, int *x, int *y, int su
   if(SDXY == 0) return NO_MEMORY;
   smoothGaussian(DXY, SDXY);
 
-
   // free DXY
   free((char*) DXY);
 
@@ -1740,6 +1739,11 @@ void svdSolve(float *x_svd, float **u, int m, int n, int *b)
 
 void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold)
 {
+//	printf("count=%d, n_sample=%d, n_iterations=%d, error_threshold=%f\n",count,n_samples,n_iterations,error_threshold);
+//	for (int i=0; i<count;i++) {
+//		printf("%d_%d, ",dx[i],dy[i]);
+//	}
+//	printf("\n");
 		int *sample_indices, **A, *bu, *bv, **AA, *bu_all, *bv_all;
 		sample_indices =(int *) calloc(n_samples,sizeof(int));
 		A = (int **) calloc(n_samples,sizeof(int));// A is a N x 3 matrix with rows [x, y, 1]

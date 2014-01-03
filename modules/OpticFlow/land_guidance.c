@@ -57,10 +57,18 @@ struct LandGuidanceStruct land_guidance_data;
 
 int32_t vision_pgain;
 int32_t vision_dgain;
+int opt_trans_dx;
+int opt_trans_dy;
+int opt_trans_x_prev;
+int opt_trans_y_prev;
 
 // Called once on paparazzi autopilot start
 void init_land_guidance()
 {
+  opt_trans_dx = 0;
+  opt_trans_dy = 0;
+  opt_trans_x_prev = 0;
+  opt_trans_y_prev = 0;
   land_guidance_data.mode = 0;
   vision_pgain = VISION_PGAIN;
   vision_dgain = VISION_DGAIN;
@@ -114,8 +122,13 @@ void run_opticflow_hover(void)
 //	autopilot_mode = AP_MODE_ATTITUDE_Z_HOLD;
 //	autopilot_mode_auto2 = AP_MODE_ATTITUDE_Z_HOLD;
 	// augment controller parameters
-	stab_att_sp_euler.phi = vision_pgain*opt_trans_x;
-	stab_att_sp_euler.theta = vision_pgain*opt_trans_y;
+	opt_trans_dx = opt_trans_x - opt_trans_x_prev;
+	opt_trans_dy = opt_trans_y - opt_trans_y_prev;
+	stab_att_sp_euler.phi = vision_dgain*opt_trans_dx + vision_pgain*opt_trans_x;
+	stab_att_sp_euler.theta = vision_dgain*opt_trans_dy + vision_pgain*opt_trans_y;
+
+	opt_trans_x_prev = opt_trans_x;
+	opt_trans_y_prev = opt_trans_y;
 }
 
 void run_opticflow_land(void)

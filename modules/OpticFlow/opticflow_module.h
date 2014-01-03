@@ -42,5 +42,4 @@ extern void opticflow_module_start(void);
 extern void opticflow_module_stop(void);
 
 
-
 #endif /* OPTICFLOW_LAND_H */
