@@ -1398,7 +1398,7 @@ static float PYTHAG(float a, float b)
     return(result);
 }
 
-int dsvd(int **a, int m, int n, float *w, float **v)
+int dsvd(float **a, int m, int n, float *w, float **v)
 {
     int flag, i, its, j, jj, k, l, nm;
     float c, f, h, s, x, y, z;
@@ -1667,7 +1667,7 @@ int dsvd(int **a, int m, int n, float *w, float **v)
     return(1);
 }
 
-void svbksb(float **u, float *w, float **v, int m, int n, int *b, float *x)
+void svbksb(float **u, float *w, float **v, int m, int n, float *b, float *x)
 {
 	int jj, j, i;
 	float s, *tmp, *vector();
@@ -1699,14 +1699,14 @@ void svbksb(float **u, float *w, float **v, int m, int n, int *b, float *x)
 	free_vector(tmp, 1, n);
 }
 
-void svdSolve(float *x_svd, float **u, int m, int n, int *b)
+void svdSolve(float *x_svd, float **u, int m, int n, float *b)
 {
 	// SVD
 	int SVD_DONE, i, j;
 
 	float *w, **v;
 	w = (float *)malloc((unsigned int) n*sizeof(float));
-	v = (float **)malloc((unsigned int) n*sizeof(float*));
+	v = (float **)malloc((unsigned int) n*sizeof(float*)); //
 	for(i=0; i<n; i++) v[i] = (float *)malloc(n*sizeof(float));
 
 	SVD_DONE = dsvd(u, m, n, w, v);
