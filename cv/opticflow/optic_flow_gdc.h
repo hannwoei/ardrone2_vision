@@ -29,7 +29,7 @@ void ScaleAdd(float* Mat3, float* Mat1, float Scale, float* Mat2, int MatW, int 
 static float PYTHAG(float a, float b);
 int dsvd(float **a, int m, int n, float *w, float **v);
 void svbksb(float **u, float *w, float **v, int m, int n, float *b, float *x);
-void svdSolve(float *x_svd, float **u, int m, int n, float *b);
+void svdSolve(float *x_svd, int **u, int m, int n, int *b);
 void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold);
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS);
 #endif
