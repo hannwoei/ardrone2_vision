@@ -71,7 +71,7 @@ void my_plugin_run(unsigned char *frame, float FPS)
 	int MAX_POINTS, error;
 	int n_found_points,mark_points;
 	int *x, *y, *new_x, *new_y, *status, *dx, *dy;
-	float *pu, *pv;
+	//float *pu, *pv;
 	mark_points = 0;
 
 	//save most recent values of attitude for the currently available frame
@@ -88,8 +88,11 @@ void my_plugin_run(unsigned char *frame, float FPS)
 	dy = (int *) calloc(40,sizeof(int));
 
 
-	pu = (float *) calloc(3,sizeof(float));
-	pv = (float *) calloc(3,sizeof(float));
+//	pu = (float *) calloc(3,sizeof(float));
+//	pv = (float *) calloc(3,sizeof(float));
+
+	float *divergence;
+	divergence = (float *) calloc(1,sizeof(float));
 
 	MAX_POINTS = 40;
 
@@ -221,7 +224,8 @@ void my_plugin_run(unsigned char *frame, float FPS)
 			float error_threshold = 10;
 			int n_iterations = 20;
 			int n_samples = (n_found_points < 5) ? n_found_points : 5;
-			float divergence, mean_tti, median_tti, d_heading, d_pitch;
+			float mean_tti, median_tti, d_heading, d_pitch;
+
 			// minimum = 3
   			if(n_samples < 3)
 			{
@@ -234,11 +238,13 @@ void my_plugin_run(unsigned char *frame, float FPS)
 //				POE_y = (float)(in->height/2);
 				return;
 			}
-//			float pu[3], pv[3];
+			float pu[3], pv[3];
 
 			float divergence_error;
 			float min_error_u, min_error_v;
 			fitLinearFlowField(pu, pv, &divergence_error, x, y, dx, dy, n_found_points, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold);
+
+
 
 /*
 			int i;
@@ -249,13 +255,15 @@ void my_plugin_run(unsigned char *frame, float FPS)
 			printf("\n");
 */
 
-			extractInformationFromLinearFlowField(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imgWidth, imgHeight, FPS);
+
+
+			extractInformationFromLinearFlowField(divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imgWidth, imgHeight, FPS);
 //			printf("div = %f\n", divergence);
 //			g_print("%f;%f;%f;%f;%f;%f;%d;%f;%f\n",opt_angle_x+diff_roll,diff_roll,opt_angle_x,opt_angle_y+diff_pitch,diff_pitch,opt_angle_y,mean_alt,opt_trans_x,opt_trans_y);
 //			printf("dx = %f, dy = %f, alt = %d, p = %f, q = %f\n", opt_trans_x, opt_trans_y, mean_alt, diff_roll, diff_pitch);
 //			printf("dx_t = %f, dy_t = %f, dx = %f, dy = %f \n", opt_trans_x, opt_trans_y, opt_angle_x+diff_roll, opt_angle_y+diff_pitch );
 			// divergence flow message
-			DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &n_found_points, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch);
+			DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &n_found_points, divergence, &mean_tti, &median_tti, &d_heading, &d_pitch);
 
 			// optic flow message
 			//float empty;
@@ -265,8 +273,8 @@ void my_plugin_run(unsigned char *frame, float FPS)
 		} //else g_print("error1\n");
 	} //else g_print("error2\n");
 
-	free(pu);
-	free(pv);
+//	free(pu);
+//	free(pv);
 	free(x);
 	free(new_x);
 	free(y);
@@ -275,7 +283,7 @@ void my_plugin_run(unsigned char *frame, float FPS)
 	free(active);
 	free(dx);
 	free(dy);
-
+	free(divergence);
 	// Send to paparazzi
 	gst2ppz.ID = 0x0001;
 	gst2ppz.counter++; // to keep track of data through ppz communication

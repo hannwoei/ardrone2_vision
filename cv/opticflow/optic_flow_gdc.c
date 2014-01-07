@@ -1704,12 +1704,24 @@ void svdSolve(float *x_svd, float **u, int m, int n, float *b)
 	// SVD
 	int SVD_DONE, i, j;
 
-	float *w, **v;
+	float *w, **v, **u_copy, *b_copy;
 	w = (float *)malloc((unsigned int) n*sizeof(float));
-	v = (float **)malloc((unsigned int) n*sizeof(float*)); //
+	v = (float **)malloc((unsigned int) n*sizeof(float*));
+	b_copy = (float *)malloc((unsigned int) m*sizeof(float));
+	u_copy = (float **)malloc((unsigned int) m*sizeof(float*));
 	for(i=0; i<n; i++) v[i] = (float *)malloc(n*sizeof(float));
 
-	SVD_DONE = dsvd(u, m, n, w, v);
+	int ii;
+	for(ii=0; ii<m; ii++)
+	{
+		u_copy[ii] = (float *)malloc(n*sizeof(float));
+		u_copy[ii][0] = u[ii][0];
+		u_copy[ii][1] = u[ii][1];
+		u_copy[ii][2] = u[ii][2];
+		b_copy[ii] = b[ii];
+	}
+//printf("svdSolve stop 1\n");
+	SVD_DONE = dsvd(u_copy, m, n, w, v);
 
 	// LS Solution
 	float wmax, wmin;
@@ -1731,10 +1743,13 @@ void svdSolve(float *x_svd, float **u, int m, int n, float *b)
 			w[j] = 0.0;
 		}
 	}
-
-	svbksb(u, w, v, m, n, b, x_svd);
+//printf("svdSolve stop 2\n");
+	svbksb(u_copy, w, v, m, n, b_copy, x_svd);
 	free(w);
 	free(v);
+	free(u_copy);
+	free(b_copy);
+//printf("svdSolve stop 3\n");
 }
 
 void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold)
@@ -1746,10 +1761,10 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 //	printf("\n");
 		int *sample_indices, **A, *bu, *bv, **AA, *bu_all, *bv_all;
 		sample_indices =(int *) calloc(n_samples,sizeof(int));
-		A = (int **) calloc(n_samples,sizeof(int));// A is a N x 3 matrix with rows [x, y, 1]
+		A = (int **) calloc(n_samples,sizeof(int*));// A1 is a N x 3 matrix with rows [x, y, 1]
 		bu = (int *) calloc(n_samples,sizeof(int)); // bu is a N x 1 vector with elements dx (or dy)
 		bv = (int *) calloc(n_samples,sizeof(int)); // bv is a N x 1 vector with elements dx (or dy)
-		AA = (int **) calloc(count,sizeof(int));   // AA contains all points with rows [x, y, 1]
+		AA = (int **) calloc(count,sizeof(int*));   // AA contains all points with rows [x, y, 1]
 		bu_all = (int *) calloc(count,sizeof(int)); // bu is a N x 1 vector with elements dx (or dy)
 		bv_all = (int *) calloc(count,sizeof(int)); // bv is a N x 1 vector with elements dx (or dy)
 		int si, add_si, p, i_rand;
@@ -1793,7 +1808,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 				{
 					if(sample_indices[ii] == si) add_si = 0;
 				}
-				if(add_si){
+				if(add_si)
+				{
 					sample_indices[i_rand] = si;
 					i_rand ++;
 				}
@@ -1811,6 +1827,13 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			}
 //printf("stop3\n");
 			// Solve the small system:
+			int i;
+
+			for(i=0;i<3;i++)
+			{
+				printf("pu%d = %f, pv%d = %f\t",i,pu[i],i,pv[i]);
+			}
+			printf("\n");
 
 			// for horizontal flow:
 			svdSolve(pu, A, n_samples, 3, bu);
@@ -1823,6 +1846,12 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			PV[it*3] = pv[0];
 			PV[it*3+1] = pv[1];
 			PV[it*3+2] = pv[2];
+/*			int i;
+			for(i=0;i<3;i++)
+			{
+				printf("pu%d = %f, pv%d = %f\t",i,pu[i],i,pv[i]);
+			}
+			printf("\n");*/
 //printf("stop4\n");
 			// count inliers and determine their error:
 			errors_pu[it] = 0;
@@ -1861,6 +1890,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			}
 		}
 //printf("stop5\n");
+/*
 		// select the parameters with lowest error:
 		// for horizontal flow:
 		int min_ind = 0;
@@ -1877,6 +1907,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		{
 			pu[param] = PU[min_ind*3+param];
 		}
+		//printf("pu_sel=%f,%f,%f\n",pu[0],pu[1],pu[2]);
 		// for vertical flow:
 		min_ind = 0;
 		*min_error_v = (float)errors_pv[0];
@@ -1917,7 +1948,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			*min_error_v += abs(C[p]);
 		}
 		*divergence_error = (*min_error_u + *min_error_v) / (2 * count);
-
+*/
 		// delete allocated dynamic arrays
 //printf("stop7\n");
 		free(A);
@@ -1932,8 +1963,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		free(AA);
 		free(bu_all);
 		free(bv_all);
-		free(bb);
-		free(C);
+//		free(bb);
+//		free(C);
 		free(sample_indices);
 //printf("stop8\n");
 }
@@ -1942,6 +1973,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 {
 		// divergence:
 		*divergence = (float)(pu[0] + pv[1]);
+//printf("div = %f\n",*divergence);
 		// minimal measurable divergence:
 		float minimal_divergence = 2E-3;
 		if(abs(*divergence) > minimal_divergence)
