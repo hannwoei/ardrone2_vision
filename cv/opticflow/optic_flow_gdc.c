@@ -1756,6 +1756,8 @@ void svdSolve(float *x_svd, int **u, int m, int n, int *b)
 	}
 //printf("svdSolve stop 2\n");
 	svbksb(u_copy, w, v, m, n, b_copy, x_svd);
+	for(ii=0; ii<m; ii++) free(u_copy[ii]);
+	for(ii=0; ii<n; ii++) free(v[ii]);
 	free(w);
 	free(v);
 	free(u_copy);
@@ -1779,6 +1781,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		bu_all = (int *) calloc(count,sizeof(int)); // bu is a N x 1 vector with elements dx (or dy)
 		bv_all = (int *) calloc(count,sizeof(int)); // bv is a N x 1 vector with elements dx (or dy)
 		int si, add_si, p, i_rand;
+		for(int sam = 0; sam < n_samples; sam++) A[sam] = (int *) calloc(3,sizeof(int));
 
 		pu[0] = 0.0f; pu[1] = 0.0f; pu[2] = 0.0f;
 		pv[0] = 0.0f; pv[1] = 0.0f; pv[2] = 0.0f;
@@ -1791,6 +1794,10 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		errors_pv = (float *) calloc(n_iterations,sizeof(float));
 		n_inliers_pu = (int *) calloc(n_iterations,sizeof(int));
 		n_inliers_pv = (int *) calloc(n_iterations,sizeof(int));
+
+		float *bb, *C;
+		bb = (float *) calloc(count,sizeof(float));
+		C = (float *) calloc(count,sizeof(float));
 
 		// initialize matrices and vectors for the full point set problem:
 		// this is used for determining inliers
@@ -1829,7 +1836,6 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			// Setup the system:
 			for(int sam = 0; sam < n_samples; sam++)
 			{
-				A[sam] = (int *) calloc(3,sizeof(int));
 				A[sam][0] = x[sample_indices[sam]];
 				A[sam][1] = y[sample_indices[sam]];
 				A[sam][2] = 1;
@@ -1839,9 +1845,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			}
 //printf("stop3\n");
 			// Solve the small system:
-			int i;
 
-/*			for(i=0;i<3;i++)
+/*			for(int i=0;i<3;i++)
 			{
 				printf("pu%d = %f, pv%d = %f\t",i,pu[i],i,pv[i]);
 			}
@@ -1858,12 +1863,13 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			PV[it*3] = pv[0];
 			PV[it*3+1] = pv[1];
 			PV[it*3+2] = pv[2];
-/*			int i;
-			for(i=0;i<3;i++)
+/*
+			for(int i=0;i<3;i++)
 			{
 				printf("pu%d = %f, pv%d = %f\t",i,pu[i],i,pv[i]);
 			}
-			printf("\n");*/
+			printf("\n");
+*/
 //printf("stop4\n");
 			// count inliers and determine their error:
 			errors_pu[it] = 0;
@@ -1872,9 +1878,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			n_inliers_pv[it] = 0;
 
 			// for horizontal flow:
-			float *bb, *C;
-			bb = (float *) calloc(count,sizeof(float));
-			C = (float *) calloc(count,sizeof(float));
+
 			MatVVMul(bb, AA, pu, 3, count);
 			float scaleM;
 			scaleM = -1.0;
@@ -1938,9 +1942,6 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		}
 //printf("stop6\n");
 		// error has to be determined on the entire set:
-		float *bb, *C;
-		bb = (float *) calloc(count,sizeof(float));
-		C = (float *) calloc(count,sizeof(float));
 		MatVVMul(bb, AA, pu, 3, count);
 		float scaleM;
 		scaleM = -1.0;
@@ -1963,6 +1964,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 
 		// delete allocated dynamic arrays
 //printf("stop7\n");
+		for(int sam = 0; sam < n_samples; sam++) free(A[sam]);
+		for(int sam = 0; sam < count; sam++) free(AA[sam]);
 		free(A);
 		free(PU);
 		free(PV);
@@ -1985,7 +1988,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 {
 		// divergence:
 		*divergence = (float)(pu[0] + pv[1]);
-printf("div = %f\n",*divergence);
+//printf("div = %f\n",*divergence);
 		// minimal measurable divergence:
 		float minimal_divergence = 2E-3;
 		if(abs(*divergence) > minimal_divergence)

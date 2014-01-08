@@ -68,55 +68,47 @@ void my_plugin_init(void)
 
 void my_plugin_run(unsigned char *frame, float FPS)
 {
-	int MAX_POINTS, error;
+	int MAX_POINTS, error_corner, error_opticflow;
 	int n_found_points,mark_points;
 	int *x, *y, *new_x, *new_y, *status, *dx, *dy;
-	//float *pu, *pv;
 	mark_points = 0;
+	MAX_POINTS = 40;
 
 	//save most recent values of attitude for the currently available frame
 	int current_pitch = ppz2gst.pitch;
 	int current_roll = ppz2gst.roll;
 	int current_alt = ppz2gst.alt;
 
-	x = (int *) calloc(40,sizeof(int));
-	new_x = (int *) calloc(40,sizeof(int));
-	y = (int *) calloc(40,sizeof(int));
-	new_y = (int *) calloc(40,sizeof(int));
-	status = (int *) calloc(40,sizeof(int));
-	dx = (int *) calloc(40,sizeof(int));
-	dy = (int *) calloc(40,sizeof(int));
-
-
-//	pu = (float *) calloc(3,sizeof(float));
-//	pv = (float *) calloc(3,sizeof(float));
+	x = (int *) calloc(MAX_POINTS,sizeof(int));
+	new_x = (int *) calloc(MAX_POINTS,sizeof(int));
+	y = (int *) calloc(MAX_POINTS,sizeof(int));
+	new_y = (int *) calloc(MAX_POINTS,sizeof(int));
+	status = (int *) calloc(MAX_POINTS,sizeof(int));
+	dx = (int *) calloc(MAX_POINTS,sizeof(int));
+	dy = (int *) calloc(MAX_POINTS,sizeof(int));
 
 	float *divergence;
 	divergence = (float *) calloc(1,sizeof(float));
 
-	MAX_POINTS = 40;
-
 	//active corner:
 	int *active;
-	active =(int *) calloc(40,sizeof(int));
+	active =(int *) calloc(MAX_POINTS,sizeof(int));
 	int GRID_ROWS = 5;
 	int ONLY_STOPPED = 0;
-	error = findActiveCorners(frame, GRID_ROWS, ONLY_STOPPED, x, y, active, &n_found_points, mark_points,imgWidth,imgHeight);
+	error_corner = findActiveCorners(frame, GRID_ROWS, ONLY_STOPPED, x, y, active, &n_found_points, mark_points,imgWidth,imgHeight);
 
-
-	//printf("error active corners = %d\n",error);
 	//printf("num_points = %d\n",n_found_points);
 /*
 	//normal corner:
 	int suppression_distance_squared;
 	suppression_distance_squared = 3 * 3;
-	error = findCorners(frame, MAX_POINTS, x, y, suppression_distance_squared, &n_found_points, mark_points,imgWidth,imgHeight);
+	error_corner = findCorners(frame, MAX_POINTS, x, y, suppression_distance_squared, &n_found_points, mark_points,imgWidth,imgHeight);
 */
-	if(error == 0)
+	if(error_corner == 0)
 	{
-		error = opticFlowLK(frame, old_img, x, y, n_found_points, imgWidth, imgHeight, new_x, new_y, status, 5, MAX_POINTS);
+		error_opticflow = opticFlowLK(frame, old_img, x, y, n_found_points, imgWidth, imgHeight, new_x, new_y, status, 5, MAX_POINTS);
 
-		//printf("error optic flow = %d\n",error);
+		//printf("error optic flow = %d\n",error_opticflow);
 
 		//calculate roll and pitch diff:
 		int diff_roll = (current_roll- old_roll)*1024;
@@ -144,9 +136,9 @@ void my_plugin_run(unsigned char *frame, float FPS)
 		old_roll = current_roll;
 		old_alt = current_alt;
 
-		if(error == 0)
+		if(error_opticflow == 0)
 		{
-			showFlow(frame, x, y, status, n_found_points, new_x, new_y, imgWidth, imgHeight);
+			//showFlow(frame, x, y, status, n_found_points, new_x, new_y, imgWidth, imgHeight);
 
 			int tot_x=0;
 			int tot_y=0;
@@ -259,7 +251,6 @@ void my_plugin_run(unsigned char *frame, float FPS)
 
 			extractInformationFromLinearFlowField(divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imgWidth, imgHeight, FPS);
 //			printf("div = %f\n", divergence);
-//			g_print("%f;%f;%f;%f;%f;%f;%d;%f;%f\n",opt_angle_x+diff_roll,diff_roll,opt_angle_x,opt_angle_y+diff_pitch,diff_pitch,opt_angle_y,mean_alt,opt_trans_x,opt_trans_y);
 //			printf("dx = %f, dy = %f, alt = %d, p = %f, q = %f\n", opt_trans_x, opt_trans_y, mean_alt, diff_roll, diff_pitch);
 //			printf("dx_t = %f, dy_t = %f, dx = %f, dy = %f \n", opt_trans_x, opt_trans_y, opt_angle_x+diff_roll, opt_angle_y+diff_pitch );
 			// divergence flow message
@@ -270,11 +261,10 @@ void my_plugin_run(unsigned char *frame, float FPS)
 			//empty = 0;
 			//DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &n_found_points, &empty, &empty, &empty, &empty, &empty);
 
-		} //else g_print("error1\n");
-	} //else g_print("error2\n");
+		}
+	}
+	DOWNLINK_SEND_OF_ERROR(DefaultChannel, DefaultDevice, &error_corner, &error_opticflow);
 
-//	free(pu);
-//	free(pv);
 	free(x);
 	free(new_x);
 	free(y);
