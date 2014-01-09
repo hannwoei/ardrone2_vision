@@ -33,6 +33,7 @@
 //#include "navigation.h"
 #include "stabilization.h"
 #include "autopilot.h"
+#include "subsystems/nav.h"
 
 // Know waypoint numbers and blocks
 //#include "generated/flight_plan.h"
@@ -134,7 +135,8 @@ void run_opticflow_hover(void)
 void run_opticflow_land(void)
 {
   // TODO: Using divergence flow for landing
-
+  // Land if the drone is close to ground
+//	if (ppz2gst.alt == 0) NavKillThrottle();
 }
 
 

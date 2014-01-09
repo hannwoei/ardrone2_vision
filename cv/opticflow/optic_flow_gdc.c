@@ -1983,10 +1983,13 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		free(sample_indices);
 //printf("stop8\n");
 }
-
+unsigned int mov_block = 24;
+float div_buf[24];
+unsigned int div_point;
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS)
 {
 		// divergence:
+
 		*divergence = (float)(pu[0] + pv[1]);
 //printf("div = %f\n",*divergence);
 		// minimal measurable divergence:
@@ -2005,13 +2008,24 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		}
 
 		// also adjust the divergence to the number of frames:
-		*divergence = *divergence * FPS;
+		//*divergence = *divergence * FPS;
+		*divergence = *divergence * 60;
 
 		// translation orthogonal to the camera axis:
 		// flow in the center of the image:
 		*d_heading = (float)(-(pu[2] + (imgWidth/2.0f) * pu[0] + (imgHeight/2.0f) * pu[1]));
 		*d_pitch = (float)(-(pv[2] + (imgWidth/2.0f) * pv[0] + (imgHeight/2.0f) * pv[1]));
 
+		//apply a moving average
+		if (*divergence < 10.0 && *divergence > -10.0) {
+			div_buf[div_point] = *divergence;
+			div_point = (div_point+1) %mov_block;
+		}
+		float div_avg = 0.0f;
+		for (int i=0;i<mov_block;i++) {
+			div_avg+=div_buf[i];
+		}
+		*divergence = div_avg/ mov_block;
 /*
 		// TODO: input/output paramters
 		//float min_error_u, min_error_v,  v_prop_x, v_prop_y, z_x, z_y, three_dimensionality, POE_x, POE_y;

@@ -72,7 +72,7 @@ void my_plugin_run(unsigned char *frame, float FPS)
 	int n_found_points,mark_points;
 	int *x, *y, *new_x, *new_y, *status, *dx, *dy;
 	mark_points = 0;
-	MAX_POINTS = 40;
+	MAX_POINTS = 25;
 
 	//save most recent values of attitude for the currently available frame
 	int current_pitch = ppz2gst.pitch;
@@ -214,7 +214,7 @@ void my_plugin_run(unsigned char *frame, float FPS)
 
 			// linear fit of the optic flow field
 			float error_threshold = 10;
-			int n_iterations = 20;
+			int n_iterations = 40; // 20
 			int n_samples = (n_found_points < 5) ? n_found_points : 5;
 			float mean_tti, median_tti, d_heading, d_pitch;
 
@@ -236,8 +236,6 @@ void my_plugin_run(unsigned char *frame, float FPS)
 			float min_error_u, min_error_v;
 			fitLinearFlowField(pu, pv, &divergence_error, x, y, dx, dy, n_found_points, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold);
 
-
-
 /*
 			int i;
 			for(i=0;i<3;i++)
@@ -247,14 +245,12 @@ void my_plugin_run(unsigned char *frame, float FPS)
 			printf("\n");
 */
 
-
-
 			extractInformationFromLinearFlowField(divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imgWidth, imgHeight, FPS);
 //			printf("div = %f\n", divergence);
 //			printf("dx = %f, dy = %f, alt = %d, p = %f, q = %f\n", opt_trans_x, opt_trans_y, mean_alt, diff_roll, diff_pitch);
 //			printf("dx_t = %f, dy_t = %f, dx = %f, dy = %f \n", opt_trans_x, opt_trans_y, opt_angle_x+diff_roll, opt_angle_y+diff_pitch );
 			// divergence flow message
-			DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &n_found_points, divergence, &mean_tti, &median_tti, &d_heading, &d_pitch);
+			DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &n_found_points, divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error);
 
 			// optic flow message
 			//float empty;
