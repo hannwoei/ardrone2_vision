@@ -32,6 +32,7 @@
 // Interact with navigation
 //#include "navigation.h"
 #include "stabilization.h"
+#include "firmwares/rotorcraft/guidance/guidance_v.h"
 #include "autopilot.h"
 #include "subsystems/nav.h"
 
@@ -51,13 +52,17 @@
 struct LandGuidanceStruct land_guidance_data;
 
 /* error if some gains are negative */
-#if (VISION_PGAIN < 0) ||                   \
-  (VISION_DGAIN < 0)
+#if (VISION_PGAIN < 0)      ||                   \
+  (VISION_DGAIN < 0)        ||                   \
+  (VISION_LAND_PGAIN < 0)   ||                   \
+  (VISION_LAND_DGAIN < 0)
 #error "ALL control gains have to be positive!!!"
 #endif
 
 int32_t vision_pgain;
 int32_t vision_dgain;
+int32_t vision_land_pgain;
+int32_t vision_land_dgain;
 int opt_trans_dx;
 int opt_trans_dy;
 int opt_trans_x_prev;
@@ -73,6 +78,8 @@ void init_land_guidance()
   land_guidance_data.mode = 0;
   vision_pgain = VISION_PGAIN;
   vision_dgain = VISION_DGAIN;
+  vision_land_pgain = VISION_LAND_PGAIN;
+  vision_land_dgain = VISION_LAND_DGAIN;
 }
 
 void run_opticflow_hover(void);
@@ -87,6 +94,11 @@ void run_land_guidance_onvision(void)
   if(autopilot_mode == AP_MODE_ATTITUDE_Z_HOLD)
   {
 	  land_guidance_data.mode = 1;
+  }
+  else if (autopilot_mode == AP_MODE_HOVER_CLIMB)
+  //or AP_MODE_ATTITUDE_CLIMB / AP_MODE_HOVER_CLIMB
+  {
+	  land_guidance_data.mode = 2;
   }
   else
   {
@@ -137,6 +149,7 @@ void run_opticflow_land(void)
   // TODO: Using divergence flow for landing
   // Land if the drone is close to ground
 //	if (ppz2gst.alt == 0) NavKillThrottle();
+	if(div_flow > 0.0f) guidance_v_zd_sp = (int)(vision_land_pgain*div_flow*10000);
 }
 
 

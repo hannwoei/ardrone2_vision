@@ -1765,7 +1765,7 @@ void svdSolve(float *x_svd, int **u, int m, int n, int *b)
 //printf("svdSolve stop 3\n");
 }
 
-void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold)
+void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold, int *n_inlier_minu, int *n_inlier_minv)
 {
 //	printf("count=%d, n_sample=%d, n_iterations=%d, error_threshold=%f\n",count,n_samples,n_iterations,error_threshold);
 //	for (int i=0; i<count;i++) {
@@ -1782,7 +1782,6 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		bv_all = (int *) calloc(count,sizeof(int)); // bv is a N x 1 vector with elements dx (or dy)
 		int si, add_si, p, i_rand;
 		for(int sam = 0; sam < n_samples; sam++) A[sam] = (int *) calloc(3,sizeof(int));
-
 		pu[0] = 0.0f; pu[1] = 0.0f; pu[2] = 0.0f;
 		pv[0] = 0.0f; pv[1] = 0.0f; pv[2] = 0.0f;
 		//		int n_inliers;
@@ -1940,6 +1939,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		{
 			pv[param] = PV[min_ind*3+param];
 		}
+		*n_inlier_minu = n_inliers_pu[min_ind];
+		*n_inlier_minv = n_inliers_pv[min_ind];
 //printf("stop6\n");
 		// error has to be determined on the entire set:
 		MatVVMul(bb, AA, pu, 3, count);
@@ -1983,9 +1984,10 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		free(sample_indices);
 //printf("stop8\n");
 }
-unsigned int mov_block = 24;
-float div_buf[24];
+unsigned int mov_block = 5;
+float div_buf[5];
 unsigned int div_point;
+
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS)
 {
 		// divergence:
@@ -2017,15 +2019,32 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		*d_pitch = (float)(-(pv[2] + (imgWidth/2.0f) * pv[0] + (imgHeight/2.0f) * pv[1]));
 
 		//apply a moving average
-		if (*divergence < 10.0 && *divergence > -10.0) {
-			div_buf[div_point] = *divergence;
-			div_point = (div_point+1) %mov_block;
+		int medianfilter = 0;
+		int averagefilter = 1;
+
+		if(averagefilter == 1)
+		{
+			if (*divergence < 10.0 && *divergence > -10.0) {
+				div_buf[div_point] = *divergence;
+				div_point = (div_point+1) %mov_block;
+			}
+			float div_avg = 0.0f;
+			for (int i=0;i<mov_block;i++) {
+				div_avg+=div_buf[i];
+			}
+			*divergence = div_avg/ mov_block;
 		}
-		float div_avg = 0.0f;
-		for (int i=0;i<mov_block;i++) {
-			div_avg+=div_buf[i];
+		else if(medianfilter == 1)
+		{
+			//apply a median filter
+			if (*divergence < 10.0 && *divergence > -10.0) {
+				div_buf[div_point] = *divergence;
+				div_point = (div_point+1) %mov_block;
+			}
+			quick_sort(div_buf,div_point);
+			*divergence  = div_buf[div_point/2];
 		}
-		*divergence = div_avg/ mov_block;
+
 /*
 		// TODO: input/output paramters
 		//float min_error_u, min_error_v,  v_prop_x, v_prop_y, z_x, z_y, three_dimensionality, POE_x, POE_y;
@@ -2088,3 +2107,41 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 */
 }
 
+void quick_sort (float *a, int n) {
+    if (n < 2)
+        return;
+    float p = a[n / 2];
+    float *l = a;
+    float *r = a + n - 1;
+    while (l <= r) {
+        if (*l < p) {
+            l++;
+            continue;
+        }
+        if (*r > p) {
+            r--;
+            continue; // we need to check the condition (l <= r) every time we change the value of l or r
+        }
+        float t = *l;
+        *l++ = *r;
+        *r-- = t;
+    }
+    quick_sort(a, r - a + 1);
+    quick_sort(l, a + n - l);
+}
+
+void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH){
+    int x, y;
+    char *Y, *gray;
+    //get only Y component for grayscale from (Y1)(U1,2)(Y2)(V1,2)
+    for (y = 0; y < imH; y++) {
+        Y = frame + (imW * 2 * y);
+        gray = grayframe + (imW * y);
+        for (x=0; x < imW; x += 2) {
+            gray[x] = *Y;
+            Y += 2;
+            gray[x + 1] = *Y;
+            Y += 2;
+        }
+    }
+}

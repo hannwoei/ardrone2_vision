@@ -15,6 +15,7 @@
   <makefile>
     <define name="ARDRONE_VIDEO_PORT" value="2002" />
     <define name="USE_ARDRONE_VIDEO" />  
+    <define name="USE_FMS" value="0"/>
 <!--    <file name="video.c"/>  -->
       <raw>
 
@@ -26,6 +27,7 @@ $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/land_guidance.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/optic_flow_gdc.c
+$(TARGET).srcs += $(DIR_CV)/opticflow/fastRosten.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/nrutil.c
 $(TARGET).srcs += $(DIR_CV)/encoding/jpeg.c
 $(TARGET).srcs += $(DIR_CV)/encoding/rtp.c

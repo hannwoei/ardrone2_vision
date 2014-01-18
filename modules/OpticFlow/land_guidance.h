@@ -39,4 +39,7 @@ void run_land_guidance_onvision(void);
 extern int32_t vision_pgain;
 extern int32_t vision_dgain;
 
+extern int32_t vision_land_pgain;
+extern int32_t vision_land_dgain;
+
 #endif /* LAND_GUIDANCE_H_ */

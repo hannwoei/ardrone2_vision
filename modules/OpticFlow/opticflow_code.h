@@ -10,6 +10,8 @@ extern unsigned int verbose;
 extern int opt_trans_x;
 extern int opt_trans_y;
 
+extern float div_flow;
+
 // Called by plugin
 void my_plugin_init(void);
 void my_plugin_run(unsigned char *frame, float FPS);
