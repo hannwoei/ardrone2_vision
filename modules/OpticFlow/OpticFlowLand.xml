@@ -11,7 +11,7 @@
 
   <init fun="opticflow_module_init()"/>
 
-  <periodic fun="opticflow_module_run()" freq="200" start="opticflow_module_start()" stop="opticflow_module_stop()" autorun="FALSE"/>
+  <periodic fun="opticflow_module_run()" freq="60" start="opticflow_module_start()" stop="opticflow_module_stop()" autorun="FALSE"/>
   <makefile>
     <define name="ARDRONE_VIDEO_PORT" value="2002" />
     <define name="USE_ARDRONE_VIDEO" />  
@@ -36,6 +36,7 @@ $(TARGET).srcs += $(DIR_LIB)/udp/socket.c
 $(TARGET).srcs += $(DIR_LIB)/v4l/video.c
 $(TARGET).CFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread
 $(TARGET).LDFLAGS += -pthread -lrt -static
+
 
 all:
 	make -C $(VISION_MODULE_FOLDER)/visionresult/

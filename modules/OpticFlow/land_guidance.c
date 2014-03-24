@@ -63,23 +63,31 @@ int32_t vision_pgain;
 int32_t vision_dgain;
 int32_t vision_land_pgain;
 int32_t vision_land_dgain;
-int opt_trans_dx;
-int opt_trans_dy;
-int opt_trans_x_prev;
-int opt_trans_y_prev;
+int OF_x;
+int OF_y;
+int OF_dx;
+int OF_dy;
+int OF_x_prev;
+int OF_y_prev;
+
+int USE_TRANSLATIONAL;
 
 // Called once on paparazzi autopilot start
 void init_land_guidance()
 {
-  opt_trans_dx = 0;
-  opt_trans_dy = 0;
-  opt_trans_x_prev = 0;
-  opt_trans_y_prev = 0;
+  OF_x = 0;
+  OF_y = 0;
+  OF_x_prev = 0;
+  OF_y_prev = 0;
+  OF_dx = 0;
+  OF_dy = 0;
+
   land_guidance_data.mode = 0;
   vision_pgain = VISION_PGAIN;
   vision_dgain = VISION_DGAIN;
   vision_land_pgain = VISION_LAND_PGAIN;
   vision_land_dgain = VISION_LAND_DGAIN;
+  USE_TRANSLATIONAL = 0;
 }
 
 void run_opticflow_hover(void);
@@ -135,13 +143,23 @@ void run_opticflow_hover(void)
 //	autopilot_mode = AP_MODE_ATTITUDE_Z_HOLD;
 //	autopilot_mode_auto2 = AP_MODE_ATTITUDE_Z_HOLD;
 	// augment controller parameters
-	opt_trans_dx = opt_trans_x - opt_trans_x_prev;
-	opt_trans_dy = opt_trans_y - opt_trans_y_prev;
-	stab_att_sp_euler.phi = vision_dgain*opt_trans_dx + vision_pgain*opt_trans_x;
-	stab_att_sp_euler.theta = vision_dgain*opt_trans_dy + vision_pgain*opt_trans_y;
-
-	opt_trans_x_prev = opt_trans_x;
-	opt_trans_y_prev = opt_trans_y;
+	USE_TRANSLATIONAL = 0;
+	if (USE_TRANSLATIONAL == 0)
+	{
+		  OF_x = opt_angle_x_raw;
+		  OF_y = opt_angle_y_raw;
+	}
+	else
+	{
+		  OF_x = opt_trans_x;
+		  OF_y = opt_trans_y;
+	}
+	  OF_dx = OF_x - OF_x_prev;
+	  OF_dy = OF_y - OF_y_prev;
+	  stab_att_sp_euler.phi = vision_dgain*OF_dx/100 + vision_pgain*OF_x/100;
+	  stab_att_sp_euler.theta = vision_dgain*OF_dy/100 + vision_pgain*OF_y/100;
+	  OF_x_prev = OF_x;
+	  OF_y_prev = OF_y;
 }
 
 void run_opticflow_land(void)
@@ -149,7 +167,7 @@ void run_opticflow_land(void)
   // TODO: Using divergence flow for landing
   // Land if the drone is close to ground
 //	if (ppz2gst.alt == 0) NavKillThrottle();
-	if(div_flow > 0.0f) guidance_v_zd_sp = (int)(vision_land_pgain*div_flow*10000);
+	if(divergence > 0.0f) guidance_v_zd_sp = (int)(vision_land_pgain*divergence*10000);
 }
 
 

@@ -37,46 +37,9 @@
 // Threaded computer vision
 #include <pthread.h>
 
-// FPS
-float FPS;
-clock_t prev_time;
-float delta_t;
-long timestamp;
-
 struct UdpSocket *sock;
 struct gst2ppz_message_struct gst2ppz;
 struct ppz2gst_message_struct ppz2gst;
-
-#define USEC_PER_SEC 1000000L
-//=== returns the number of usecs of (t2 - t1)
-
-long time_elapsed (struct timeval *t1, struct timeval *t2) {
-
-	long sec, usec;
-
-	sec = t2->tv_sec - t1->tv_sec;
-	usec = t2->tv_usec - t1->tv_usec;
-	if (usec < 0) {
-		--sec;
-		usec = usec + USEC_PER_SEC;
-	}
-	return sec*USEC_PER_SEC + usec;
-}
-
-struct timeval start_time;
-struct timeval end_time;
-
-void start_timer() {
-//	struct timezone tz;
-//	gettimeofday (&start_time, &tz);
-	gettimeofday (&start_time, NULL);
-}
-long end_timer() {
-//	struct timezone tz;
-//	gettimeofday (&end_time, &tz);
-	gettimeofday (&end_time, NULL);
-	return time_elapsed(&start_time, &end_time);
-}
 
 void opticflow_module_init(void) {
 
@@ -87,12 +50,6 @@ void opticflow_module_init(void) {
   // Navigation Code Initialization
   init_land_guidance();
 
-  // FPS
-  FPS = 0.0;
-  prev_time = 0.0;
-  delta_t = 0.0;
-  timestamp=0;
-  start_timer();
 }
 
 
@@ -105,7 +62,7 @@ void opticflow_module_run(void) {
   ppz2gst.counter++; // 512 Hz
   ppz2gst.roll = att->phi;
   ppz2gst.pitch = att->theta;
-  ppz2gst.alt = navdata_height();
+//  ppz2gst.alt = navdata_height();
 
   // Read Latest Vision Module Results
   if (computervision_thread_has_results)
@@ -200,26 +157,8 @@ void *computervision_thread_main(void* data)
     // Resize: device by 4
     resize_uyuv(img_new, &small, DOWNSIZE_FACTOR);
 
-	// FPS:
-/*
-	clock_t curr_time = clock();
-	if(prev_time != 0)
-	{
-		delta_t = (curr_time - prev_time) / (float) CLOCKS_PER_SEC;
-		float ratio = 0.5; //time constant
-		FPS = ((ratio * FPS + (1-ratio) * (1.0f / delta_t))); // smoothed average
-//		FPS = 1.0f / (float) delta_t;
-	}
-	//printf("previous = %d,current = %d, dt = %f, FPS = %f\n",prev_time, curr_time, delta_t, FPS);
-	prev_time = curr_time;
-*/
-    timestamp = end_timer();
-    FPS = (float) 1000000/(float)timestamp;
-//    printf("dt = %d, FPS = %f\n",timestamp, FPS);
-    start_timer();
-
     // Process
-    my_plugin_run(small.buf, FPS);
+    my_plugin_run(small.buf);
 
 #ifdef DOWNLINK_VIDEO
     // JPEG encode the image:
