@@ -1,6 +1,29 @@
 #ifndef OPTIC
 #define OPTIC
 
+typedef struct flowPoint
+{
+	int x;
+	int y;
+	int prev_x;
+	int prev_y;
+	int dx;
+	int dy;
+	int new_dx;
+	int new_dy;
+//	double P[16]; // represents a diagonal 4x4 matrix
+//	double Q[16]; // represents a diagonal 4x4 matrix
+//	double R[16]; // represents a diagonal 4x4 matrix
+//	double K[16]; // represents a diagonal 4x4 matrix
+//	int n_observations;
+} flowPoint;
+
+typedef struct detectedPoint
+{
+	int x;
+	int y;
+} detectedPoint;
+
 int getMaximum(int * Im);
 int getMinimum(int * Im);
 void getGradientPixelWH(unsigned char *frame_buf, int x, int y, int* dx, int* dy);
@@ -24,9 +47,8 @@ int getSumPatch(int* Patch, int size);
 void showFlow(unsigned char * frame_buf, int* x, int* y, int* status, int n_found_points, int* new_x, int* new_y, int imgW, int imgH);
 int opticFlowLK(unsigned char * new_image_buf, unsigned char * old_image_buf, int* p_x, int* p_y, int n_found_points, int imW, int imH, int* new_x, int* new_y, int* status, int half_window_size, int max_iterations);
 void MatMul(float* Mat1, float* Mat2, float* Mat3, int MatW, int MatH);
-void MatVVMul(float* MVec, float** Mat, float* Vec, int MatW, int MatH);
-void ScaleAdd(float* Mat3, float* Mat1, float Scale, float* Mat2, int MatW, int MatH);
-static float PYTHAG(float a, float b);
+void MatVVMul(float* MVec, int** Mat, float* Vec, int MatW, int MatH);
+void ScaleAdd(float* Mat3, float* Mat1, float Scale, int* Mat2, int MatW, int MatH);
 int dsvd(float **a, int m, int n, float *w, float **v);
 void svbksb(float **u, float *w, float **v, int m, int n, float *b, float *x);
 void svdSolve(float *x_svd, int **u, int m, int n, int *b);
@@ -34,4 +56,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS);
 void quick_sort (float *a, int n);
 void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH);
+void setPointsToFlowPoints(struct flowPoint flow_points[], struct detectedPoint detected_points[], int *flow_point_size, int *count, int MAX_COUNT);
+void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[]);
+void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
+void analyseTTI(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH);
 #endif

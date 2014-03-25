@@ -109,6 +109,7 @@ volatile uint8_t computer_vision_thread_command = 0;
 void *computervision_thread_main(void* data);
 void *computervision_thread_main(void* data)
 {
+	//start timer volatile variable (IRQ)
   // Video Input
   struct vid_struct vid;
   vid.device = (char*)"/dev/video2"; // video1 = front camera; video2 = bottom camera

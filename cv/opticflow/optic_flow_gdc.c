@@ -1,9 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include "optic_flow_gdc.h"
 #include "defs_and_types.h"
 #include "nrutil.h"
+#include "opticflow/fastRosten.h"
 
 #define int_index(x,y) (y * IMG_WIDTH + x)
 #define uint_index(xx, yy) (((yy * IMG_WIDTH + xx) * 2) & 0xFFFFFFFC)
@@ -11,6 +13,7 @@
 #define OK 0
 #define N_VISUAL_INPUTS 51
 #define N_ACTIONS 3
+#define MAX_COUNT_PT 50
 
 unsigned int IMG_WIDTH, IMG_HEIGHT;
 int weights[153] = {-78, -46, 18, 59, 0, 100, 0, 0, 100, -29, -45, 0, 15, -30, 59, -100, -99, -100, -47, 0, -100, -100, 2, -78, 0, 10, -68, 53, 0, 0, -61, -28, 51, 0, -86, -73, 10, -65, -100, 98, -19, 63, -100, -42, -83, 21, 0, 3, 7, 0, -100, 24, -100, -99, -40, -100, 91, 0, 0, 54, 0, -90, -22, 13, 6, 31, 0, 100, -58, -31, 100, 5, 21, -100, 37, -100, 57, 100, -96, -3, -74, -3, -64, -68, 6, -100, -71, -81, 100, 13, 100, 0, -100, -57, 77, -100, -61, -100, 0, 37, -100, -100, -100, 10, -36, -100, 62, 8, 0, 21, 2, -61, -5, 32, -64, 15, -100, -90, -74, -18, -22, -28, 42, -92, 0, 3, -3, -13, 100, -5, 88, 0, 7, -100, 90, 73, -53, 100, 0, 2, 0, -95, -60, -62, 0, -6, 82, 0, -79, -69, 73, -38, 100};
@@ -1358,7 +1361,7 @@ void MatMul(float* Mat3, float* Mat1, float* Mat2, int MatW, int MatH)
   }
 }
 
-void MatVVMul(float* MVec, float** Mat, float* Vec, int MatW, int MatH)
+void MatVVMul(float* MVec, int** Mat, float* Vec, int MatW, int MatH)
 {
   unsigned int i;
   unsigned int j;
@@ -1367,12 +1370,12 @@ void MatVVMul(float* MVec, float** Mat, float* Vec, int MatW, int MatH)
   {
     for(j = 0; j < MatW; j++)
     {
-    	MVec[i] += Mat[i][j] * Vec[j];
+    	MVec[i] += ((float) Mat[i][j]) * Vec[j];
     }
   }
 }
 
-void ScaleAdd(float* Mat3, float* Mat1, float Scale, float* Mat2, int MatW, int MatH)
+void ScaleAdd(float* Mat3, float* Mat1, float Scale, int* Mat2, int MatW, int MatH)
 {
   unsigned int i;
   unsigned int j;
@@ -1383,12 +1386,12 @@ void ScaleAdd(float* Mat3, float* Mat1, float Scale, float* Mat2, int MatW, int 
     for(j = 0; j < MatH; j++)
     {
       ii = (j * MatW + i);
-      Mat3[ii] = Scale* Mat1[ii] + Mat2[ii];
+      Mat3[ii] = Scale*((float) Mat1[ii]) + Mat2[ii];
     }
   }
 }
-
-static float PYTHAG(float a, float b)
+static float PYTHAG(float a, float b);
+float PYTHAG(float a, float b)
 {
     float at = fabs(a), bt = fabs(b), ct, result;
 
@@ -1670,8 +1673,8 @@ int dsvd(float **a, int m, int n, float *w, float **v)
 void svbksb(float **u, float *w, float **v, int m, int n, float *b, float *x)
 {
 	int jj, j, i;
-	float s, *tmp, *vector();
-	void free_vector();
+	float s, *tmp;//, *vector(int nl, int nh);
+	//void free_vector();
 
 	tmp = vector(1,n);
 	for(j=0; j<n; j++)
@@ -1702,7 +1705,7 @@ void svbksb(float **u, float *w, float **v, int m, int n, float *b, float *x)
 void svdSolve(float *x_svd, int **u, int m, int n, int *b)
 {
 	// SVD
-	int SVD_DONE, i, j;
+	int i, j;
 
 	float *w, **v, **u_copy, *b_copy;
 	w = (float *)malloc((unsigned int) n*sizeof(float));
@@ -1722,7 +1725,7 @@ void svdSolve(float *x_svd, int **u, int m, int n, int *b)
 		//printf("%d,%f,%f,%f,%f\n",ii,u_copy[ii][0] ,u_copy[ii][1] ,u_copy[ii][2] ,b_copy[ii]);
 	}
 //printf("svdSolve stop 1\n");
-	SVD_DONE = dsvd(u_copy, m, n, w, v);
+	dsvd(u_copy, m, n, w, v);
 	//printf("SVD_DONE = %d\n",SVD_DONE);
 
 /*	for (i=0;i<m;i++)
@@ -1780,8 +1783,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		AA = (int **) calloc(count,sizeof(int*));   // AA contains all points with rows [x, y, 1]
 		bu_all = (int *) calloc(count,sizeof(int)); // bu is a N x 1 vector with elements dx (or dy)
 		bv_all = (int *) calloc(count,sizeof(int)); // bv is a N x 1 vector with elements dx (or dy)
-		int si, add_si, p, i_rand;
-		for(int sam = 0; sam < n_samples; sam++) A[sam] = (int *) calloc(3,sizeof(int));
+		int si, add_si, p, i_rand, sam;
+		for(sam = 0; sam < n_samples; sam++) A[sam] = (int *) calloc(3,sizeof(int));
 		pu[0] = 0.0f; pu[1] = 0.0f; pu[2] = 0.0f;
 		pv[0] = 0.0f; pv[1] = 0.0f; pv[2] = 0.0f;
 		//		int n_inliers;
@@ -1800,7 +1803,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 
 		// initialize matrices and vectors for the full point set problem:
 		// this is used for determining inliers
-		for(int sam = 0; sam < count; sam++)
+		for(sam = 0; sam < count; sam++)
 		{
 			AA[sam] = (int *) calloc(3,sizeof(int));
 			AA[sam][0] = x[sam];
@@ -1811,7 +1814,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		}
 
 		// perform RANSAC:
-		for(int it = 0; it < n_iterations; it++)
+		int it, ii;
+		for(it = 0; it < n_iterations; it++)
 		{
 			// select a random sample of n_sample points:
 			memset(sample_indices, 0, n_samples*sizeof(int));
@@ -1821,7 +1825,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			{
 				si = rand() % count;
 				add_si = 1;
-				for(int ii = 0; ii < i_rand; ii++)
+				for(ii = 0; ii < i_rand; ii++)
 				{
 					if(sample_indices[ii] == si) add_si = 0;
 				}
@@ -1833,7 +1837,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			}
 //printf("stop2\n");
 			// Setup the system:
-			for(int sam = 0; sam < n_samples; sam++)
+			for(sam = 0; sam < n_samples; sam++)
 			{
 				A[sam][0] = x[sample_indices[sam]];
 				A[sam][1] = y[sample_indices[sam]];
@@ -1844,8 +1848,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			}
 //printf("stop3\n");
 			// Solve the small system:
-
-/*			for(int i=0;i<3;i++)
+/*            int i;
+			for(i=0;i<3;i++)
 			{
 				printf("pu%d = %f, pv%d = %f\t",i,pu[i],i,pv[i]);
 			}
@@ -1862,13 +1866,14 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			PV[it*3] = pv[0];
 			PV[it*3+1] = pv[1];
 			PV[it*3+2] = pv[2];
-/*
-			for(int i=0;i<3;i++)
+
+/*			int i;
+			for(i=0;i<3;i++)
 			{
 				printf("pu%d = %f, pv%d = %f\t",i,pu[i],i,pv[i]);
 			}
-			printf("\n");
-*/
+			printf("\n");*/
+
 //printf("stop4\n");
 			// count inliers and determine their error:
 			errors_pu[it] = 0;
@@ -1885,6 +1890,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 
 			for(p = 0; p < count; p++)
 			{
+//				printf("h=%f ",C[p]);
 				if(C[p] < error_threshold)
 				{
 					errors_pu[it] += abs(C[p]);
@@ -1895,22 +1901,27 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			MatVVMul(bb, AA, pv, 3, count);
 			ScaleAdd(C, bb, scaleM, bv_all, 1, count);
 
+//			printf("\n");
+
 			for(p = 0; p < count; p++)
 			{
+//				printf("v=%f ",C[p]);
 				if(C[p] < error_threshold)
 				{
 					errors_pv[it] += abs(C[p]);
 					n_inliers_pv[it]++;
 				}
 			}
+//			printf("\n");
 		}
 //printf("stop5\n");
 
 		// select the parameters with lowest error:
 		// for horizontal flow:
+		int param;
 		int min_ind = 0;
 		*min_error_u = (float)errors_pu[0];
-		for(int it = 1; it < n_iterations; it++)
+		for(it = 1; it < n_iterations; it++)
 		{
 			if(errors_pu[it] < *min_error_u)
 			{
@@ -1918,7 +1929,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 				min_ind = it;
 			}
 		}
-		for(int param = 0; param < 3; param++)
+		for(param = 0; param < 3; param++)
 		{
 			pu[param] = PU[min_ind*3+param];
 		}
@@ -1927,7 +1938,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		min_ind = 0;
 		*min_error_v = (float)errors_pv[0];
 
-		for(int it = 0; it < n_iterations; it++)
+		for(it = 0; it < n_iterations; it++)
 		{
 			if(errors_pv[it] < *min_error_v)
 			{
@@ -1935,7 +1946,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 				min_ind = it;
 			}
 		}
-		for(int param = 0; param < 3; param++)
+		for(param = 0; param < 3; param++)
 		{
 			pv[param] = PV[min_ind*3+param];
 		}
@@ -1965,8 +1976,8 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 
 		// delete allocated dynamic arrays
 //printf("stop7\n");
-		for(int sam = 0; sam < n_samples; sam++) free(A[sam]);
-		for(int sam = 0; sam < count; sam++) free(AA[sam]);
+		for(sam = 0; sam < n_samples; sam++) free(A[sam]);
+		for(sam = 0; sam < count; sam++) free(AA[sam]);
 		free(A);
 		free(PU);
 		free(PV);
@@ -1984,9 +1995,9 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		free(sample_indices);
 //printf("stop8\n");
 }
-unsigned int mov_block = 5;
-float div_buf[5];
-unsigned int div_point;
+unsigned int mov_block = 6;
+float div_buf[6];
+unsigned int div_point = 0;
 
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS)
 {
@@ -2010,8 +2021,8 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		}
 
 		// also adjust the divergence to the number of frames:
-		//*divergence = *divergence * FPS;
-		*divergence = *divergence * 60;
+//		*divergence = *divergence * FPS;
+//		*divergence = *divergence * 60;
 
 		// translation orthogonal to the camera axis:
 		// flow in the center of the image:
@@ -2021,18 +2032,21 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		//apply a moving average
 		int medianfilter = 0;
 		int averagefilter = 1;
+		float div_avg = 0.0f;
 
 		if(averagefilter == 1)
 		{
 			if (*divergence < 10.0 && *divergence > -10.0) {
 				div_buf[div_point] = *divergence;
-				div_point = (div_point+1) %mov_block;
+				div_point = (div_point+1) %mov_block; // index starts from 0 to mov_block
 			}
-			float div_avg = 0.0f;
-			for (int i=0;i<mov_block;i++) {
-				div_avg+=div_buf[i];
+
+			int im;
+			for (im=0;im<mov_block;im++) {
+				div_avg+=div_buf[im];
 			}
-			*divergence = div_avg/ mov_block;
+//			*divergence = div_avg/ mov_block;
+			*divergence = div_avg;
 		}
 		else if(medianfilter == 1)
 		{
@@ -2132,7 +2146,7 @@ void quick_sort (float *a, int n) {
 
 void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH){
     int x, y;
-    char *Y, *gray;
+    unsigned char *Y, *gray;
     //get only Y component for grayscale from (Y1)(U1,2)(Y2)(V1,2)
     for (y = 0; y < imH; y++) {
         Y = frame + (imW * 2 * y);
@@ -2144,4 +2158,206 @@ void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int i
             Y += 2;
         }
     }
+}
+
+void setPointsToFlowPoints(struct flowPoint flow_points[], struct detectedPoint detected_points[], int *flow_point_size, int *count, int MAX_COUNT)
+{
+	// set the points array to match the flow points:
+	int new_size = (*flow_point_size < MAX_COUNT) ? *flow_point_size : MAX_COUNT;
+	*count = new_size;
+	int i;
+	for(i = 0; i < new_size; i++)
+	{
+		detected_points[i].x = flow_points[i].x;
+		detected_points[i].y = flow_points[i].y;
+	}
+}
+
+void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[])
+{
+	// a) find suitable points in the image
+	// b) compare their locations with those of flow_points, only allowing new points if far enough
+	// c) update flow_points (and points) to include the new points
+	// d) put the flow point into the points-array, which will be used for the flow
+
+	// a)
+
+	// FAST corner:
+	int fast_threshold = 10; //10
+	xyFAST* pnts_fast;
+
+	CvtYUYV2Gray(gray_frame, frame, imW, imH); // convert to gray scaled image is a must for FAST corner
+
+//	if(!prev_gray_frame)
+//	{
+//		memcpy(prev_gray_frame,gray_frame,imgHeight*imgWidth);
+//	}
+
+	pnts_fast = fast9_detect((const byte*)gray_frame, imW, imH, imW, fast_threshold, count);
+
+	// transform the points to the format we need (is also done in the other corner finders
+	*count = (*count > MAX_COUNT) ? MAX_COUNT : *count;
+	int i,j;
+	for(i = 0; i < *count; i++)
+	{
+		detected_points[i].x = pnts_fast[i].x;
+		detected_points[i].y = pnts_fast[i].y;
+	}
+
+	free(pnts_fast);
+
+	// if more points than the user-determined maximum are found, ignore the superfluous points:
+	if(*count > max_count) *count = max_count;
+//	if(*count < 5)
+//	{
+//		printf("Number of points found: %d\n", *count);
+//	}
+
+	// b)
+	float distance2;
+	float min_distance = 10;
+	float min_distance2 = min_distance*min_distance;
+	int new_point;
+
+	int max_new_points = (*count < max_count - *flow_point_size) ? *count : max_count - *flow_point_size; //flow_point_size = [0,25]
+
+	for(i = 0; i < max_new_points; i++)
+	{
+		new_point = 1;
+
+		for(j = 0; j < *flow_point_size; j++)
+		{
+			// distance squared:
+			distance2 = (detected_points[i].x - flow_points[j].x)*(detected_points[i].x - flow_points[j].x) +
+						(detected_points[i].y - flow_points[j].y)*(detected_points[i].y - flow_points[j].y);
+			if(distance2 < min_distance2)
+			{
+				new_point = 0;
+			}
+		}
+
+		// c)
+		if(new_point)
+		{
+			// add the flow_points:
+			flow_points[*flow_point_size].x = detected_points[i].x;
+			flow_points[*flow_point_size].y = detected_points[i].y;
+			flow_points[*flow_point_size].prev_x = detected_points[i].x;
+			flow_points[*flow_point_size].prev_y = detected_points[i].y;
+			flow_points[*flow_point_size].dx = 0;
+			flow_points[*flow_point_size].dy = 0;
+			flow_points[*flow_point_size].new_dx = 0;
+			flow_points[*flow_point_size].new_dy = 0;
+			(*flow_point_size)++;
+		}
+	}
+	setPointsToFlowPoints(flow_points, detected_points, flow_point_size, count, MAX_COUNT);
+}
+
+void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status)
+{
+
+	// a) track the points to the new image
+	// b) quality checking  for eliminating points (status / match error / tracking the features back and comparing / etc.)
+	// c) update the points (immediate update / Kalman update)
+	int error_opticflow = 0;
+
+	int i;
+
+	// a) track the points to the new image
+
+	if( *count > 0)
+    {
+			for(i=0; i<*count; i++)
+			{
+				x[i] = detected_points[i].x;
+				y[i] = detected_points[i].y;
+			}
+			error_opticflow = opticFlowLK(frame, prev_frame, x, y, *count, imW, imH, new_x, new_y, status, 5, MAX_COUNT);
+	}
+
+	if(error_opticflow == 0)
+	{
+		// b) quality checking  for eliminating points (status / match error / tracking the features back and comparing / etc.)
+		int remove_point = 0;
+		int c;
+		for(i = *flow_point_size-1; i >= 0; i-- )
+	    {
+	        if(!status[i])
+			{
+				remove_point = 1;
+			}
+
+			// error[i] can also be used, etc.
+
+			if(remove_point)
+			{
+				// we now erase the point if it is not observed in the new image
+				// later we may count it as a single miss, allowing for a few misses
+				for(c = i; c < *flow_point_size-1; c++)
+				{
+					flow_points[c].x = flow_points[c+1].x;
+					flow_points[c].y = flow_points[c+1].y;
+					flow_points[c].prev_x= flow_points[c+1].prev_x;
+					flow_points[c].prev_y = flow_points[c+1].prev_y;
+					flow_points[c].dx = flow_points[c+1].dx;
+					flow_points[c].dy = flow_points[c+1].dy;
+					flow_points[c].new_dx = flow_points[c+1].new_dx;
+					flow_points[c].new_dy = flow_points[c+1].new_dy;
+				}
+				(*flow_point_size)--;
+			}
+			else
+			{
+				flow_points[i].new_dx = new_x[i] - x[i];
+				flow_points[i].new_dy = new_y[i] - y[i];
+			}
+		}
+
+		// c) update the points (immediate update / Kalman update)
+		*count = *flow_point_size;
+
+		for(i = 0; i < *count; i++)
+		{
+			// immediate update:
+			flow_points[i].dx = flow_points[i].new_dx;
+			flow_points[i].dy = flow_points[i].new_dy;
+			flow_points[i].prev_x = flow_points[i].x;
+			flow_points[i].prev_y = flow_points[i].y;
+			flow_points[i].x = flow_points[i].x + flow_points[i].dx;
+			flow_points[i].y = flow_points[i].y + flow_points[i].dy;
+		}
+	}
+
+	return;
+}
+
+void analyseTTI(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH)
+{
+		// linear fit of the optic flow field
+		float error_threshold = 10; // 10
+		int n_iterations = 20; // 40
+
+		int n_samples = (count < 5) ? count : 5;
+		float mean_tti, median_tti, d_heading, d_pitch;
+
+		// minimum = 3
+		if(n_samples < 3)
+		{
+			// set dummy values for tti, etc.
+			mean_tti = 1000.0f / 60;
+			median_tti = mean_tti;
+			d_heading = 0;
+			d_pitch = 0;
+			return;
+		}
+		float pu[3], pv[3];
+
+		float divergence_error;
+		float min_error_u, min_error_v;
+		fitLinearFlowField(pu, pv, &divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
+
+		extractInformationFromLinearFlowField(divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imW, imH, 60);
+
+//		printf("0:%d\n1:%f\n",count,divergence[0]);
 }

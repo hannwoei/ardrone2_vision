@@ -45,10 +45,7 @@ int diff_pitch_buf[24];
 int opt_trans_x_buf[32];
 int opt_trans_y_buf[32];
 
-int n_found_points;
-int n_used_points;
-
-unsigned int buf_point;
+unsigned int buf_point = 0;
 unsigned int buf_imu_point;
 unsigned int buf_opt_trans_point;
 
@@ -68,9 +65,6 @@ detectedPoint detected_points[150];
 // Called by plugin
 void my_plugin_init(void)
 {
-
-	n_found_points = 0;
-	n_used_points = 0;
 
 	// Init variables
 	ppz2gst.pitch = 0;
@@ -180,7 +174,7 @@ void my_plugin_run(unsigned char *frame)
 
 		//tele purpose
 int diff_roll, diff_pitch, mean_alt;
-float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error, div_flow;
+float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error;
 
 		int USE_FITTING = 1;
 
@@ -191,7 +185,7 @@ float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error, 
 
 		memcpy(prev_frame,frame,imgHeight*imgWidth*2);
 
-		DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &n_found_points, &count, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv);
+		DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &count, &count, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv);
     }
 
 	DOWNLINK_SEND_OF_ERROR(DefaultChannel, DefaultDevice, &error_corner, &error_opticflow);
