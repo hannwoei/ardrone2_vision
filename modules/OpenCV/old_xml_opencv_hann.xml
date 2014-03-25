@@ -1,0 +1,33 @@
+      	
+VISION_MODULE_FOLDER = $(DIR_MODULES)/OpenCV
+      	
+<!--REMOTEROOTFS = /home/h2w/OMAP/data/remoteRootFS-->
+
+OPENCV_C = /home/h2w/OMAP/thirdParty/opencv_install_ardrone/install/include
+	      	
+<!--INCLUDES_OPENCV = -I$(OPENCV_C)/ -I$(OPENCV_C)/opencv2/core/ -I$(OPENCV_C)/opencv2/imgproc/ -I$(OPENCV_C)/opencv2/video/ -I$(OPENCV_C)/opencv2/features2d/ -I$(OPENCV_C)/opencv2/flann/ -I$(OPENCV_C)/opencv2/calib3d/ -I$(OPENCV_C)/opencv2/objdetect/ -I$(OPENCV_C)/opencv2/legacy/ -I$(OPENCV_C)/opencv2/highgui/ -I$(OPENCV_C)/opencv2/ml/--> <!---I$(OPENCV_C)/include/ -I$(OPENCV_C)/include/opencv/-->
+   
+INCLUDES_OPENCV = -I$(OPENCV_C)/ -I$(OPENCV_C)/opencv/ -I$(OPENCV_C)/opencv2/
+<!--CROSS_OPENCV_INSTALL = /home/h2w/OMAP/thirdParty/opencv_install_ardrone-->
+
+CROSS_OPENCV_INSTALL = /home/h2w/OMAP/thirdParty/opencv_install_ardrone
+	      	
+<!--LIBS_OPENCV = $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_calib3d.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_contrib.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_core.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_features2d.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_flann.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_gpu.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_highgui.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_imgproc.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_legacy.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_ml.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_nonfree.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_objdetect.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_photo.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_stitching.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_ts.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_video.a $(CROSS_OPENCV_INSTALL)/install/lib/libopencv_videostab.a $(CROSS_OPENCV_INSTALL)/3rdparty/lib/libzlib.a-->
+	  
+LIBS_OPENCV = $(CROSS_OPENCV_INSTALL)/install/lib/libopencv*.a $(CROSS_OPENCV_INSTALL)/3rdparty/lib/lib*.a <!--/home/h2w/OMAP/thirdParty/opencv_install_ardrone/lib/libopencv*.so-->
+	
+$(TARGET).srcs += $(VISION_MODULE_FOLDER)/opencv_module.c
+$(TARGET).srcs += $(VISION_MODULE_FOLDER)/opencv_code.c
+$(TARGET).srcs += $(DIR_CV)/encoding/jpeg.c
+$(TARGET).srcs += $(DIR_CV)/encoding/rtp.c
+$(TARGET).srcs += $(DIR_CV)/trig.c
+$(TARGET).srcs += $(DIR_LIB)/udp/socket.c
+$(TARGET).srcs += $(DIR_LIB)/v4l/video.c
+#$(TARGET).CFLAGS +=  -Wall -Wno-unused-function -O3 -mfloat-abi=soft -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -L$(CROSS_OPENCV_INSTALL)/install/lib/ $(INCLUDES_OPENCV)
+#$(TARGET).LDFLAGS += -pthread -lrt -static $(LIBS_OPENCV) -$(CROSS_OPENCV_INSTALL)/3rdparty/lpng -ldl -lm -lpthread -lstdc++ -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/ljasper -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/ljpeg -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/ltiff -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lz -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgtk-x11-2.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgdk-x11-2.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/latk-1.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgio-2.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lpangoft2-1.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lpangocairo-1.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgdk_pixbuf-2.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lcairo -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lpng12 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lpango-1.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lfreetype -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lfontconfig -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgobject-2.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgmodule-2.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgthread-2.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lglib-2.0 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgstbase-0.10 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lgstreamer-0.10 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lxml2 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lrt -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lavcodec -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lavformat -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lavutil -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lswscale -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/ldc1394 -$(CROSS_OPENCV_INSTALL)/3rdparty/lib/lv4l1
+
+
+all:
+	make -C $(VISION_MODULE_FOLDER)/visionresult/
+
+    </raw>
