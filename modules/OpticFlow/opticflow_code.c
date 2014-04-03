@@ -28,7 +28,7 @@ unsigned int verbose = 0;
 
 // Local variables
 //static unsigned char * img_uncertainty;
-unsigned char *prev_frame, *gray_frame;
+unsigned char *prev_frame, *gray_frame, *prev_gray_frame;
 
 int old_img_init;
 int old_pitch, old_roll, old_alt;
@@ -59,8 +59,10 @@ int count = 0;
 int max_count = 25;
 int flow_point_size = 0;
 #define MAX_COUNT 150	// Maximum number of flow points
-flowPoint flow_points[150];
-detectedPoint detected_points[150];
+flowPoint flow_points[MAX_COUNT];
+detectedPoint detected_points0[MAX_COUNT];
+detectedPoint detected_points1[MAX_COUNT];
+detectedPoint swap_points[MAX_COUNT];
 
 // Called by plugin
 void my_plugin_init(void)
@@ -70,6 +72,7 @@ void my_plugin_init(void)
 	ppz2gst.pitch = 0;
 	ppz2gst.roll = 0;
 	gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
+	prev_gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
 	prev_frame = (unsigned char *) calloc(imgWidth*imgHeight*2,sizeof(unsigned char));
 	old_img_init = 1;
 
@@ -117,14 +120,14 @@ void my_plugin_run(unsigned char *frame)
     {
     	// Clear corners
     	memset(flow_points,0,sizeof(flowPoint)*flow_point_size);
-    	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points);
+    	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
     }
     else
     {
     	int threshold_n_points = 25;
     	if(flow_point_size < threshold_n_points)
     	{
-    		findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points);
+    		findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
     	}
     }
 
@@ -133,7 +136,15 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
     if(count)
     {
-		trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points, x, y, new_x, new_y, dx, dy, status);
+    	unsigned int USE_OPENCV = 1;
+    	if(USE_OPENCV)
+    	{
+    		trackPointsCV(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points,&flow_point_size, detected_points0, detected_points1, x, y, new_x, new_y, dx, dy, status);
+    	}
+    	else
+    	{
+    		trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, x, y, new_x, new_y, dx, dy, status);
+    	}
 //		showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
 
 		int tot_x=0;
@@ -176,14 +187,25 @@ void my_plugin_run(unsigned char *frame)
 int diff_roll, diff_pitch, mean_alt;
 float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error;
 
-		int USE_FITTING = 1;
+		int USE_FITTING = 0;
 
 		if(USE_FITTING == 1)
 		{
 			analyseTTI(&divergence, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight);
 		}
 
+		// *********************************************
+		// (5) housekeeping to prepare for the next call
+		// *********************************************
+
 		memcpy(prev_frame,frame,imgHeight*imgWidth*2);
+		int i;
+		for (i=0;i<count;i++)
+		{
+			swap_points[i] = detected_points0[i];
+			detected_points0[i] = detected_points1[i];
+			detected_points1[i] = swap_points[i];
+		}
 
 		DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &diff_roll, &diff_pitch, &mean_alt, &count, &count, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv);
     }

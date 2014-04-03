@@ -42,7 +42,7 @@ struct gst2ppz_message_struct gst2ppz;
 struct ppz2gst_message_struct ppz2gst;
 
 void opticflow_module_init(void) {
-
+	opticflow_module_start();
   // Give unique ID's to messages TODO: check that received messages are correct (not from an incompatable gst plugin)
   ppz2gst.ID = 0x0003;
   gst2ppz.ID = 0x0004;
@@ -109,7 +109,7 @@ volatile uint8_t computer_vision_thread_command = 0;
 void *computervision_thread_main(void* data);
 void *computervision_thread_main(void* data)
 {
-	//start timer volatile variable (IRQ)
+	//start timer using volatile variable (IRQ)
   // Video Input
   struct vid_struct vid;
   vid.device = (char*)"/dev/video2"; // video1 = front camera; video2 = bottom camera

@@ -7,6 +7,11 @@
 #include "nrutil.h"
 #include "opticflow/fastRosten.h"
 
+//OpenCV
+#include <opencv2/core/core_c.h>
+#include <opencv2/highgui/highgui_c.h>
+#include <opencv2/imgproc/imgproc_c.h>
+
 #define int_index(x,y) (y * IMG_WIDTH + x)
 #define uint_index(xx, yy) (((yy * IMG_WIDTH + xx) * 2) & 0xFFFFFFFC)
 #define NO_MEMORY -1
@@ -2160,6 +2165,53 @@ void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int i
     }
 }
 
+/* convert from 4:2:2 YUYV interlaced to RGB24 */
+/* based on ccvt_yuyv_bgr32() from camstream */
+#define SAT(c) \
+   if (c & (~255)) { if (c < 0) c = 0; else c = 255; }
+
+void yuyv_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst)
+{
+   int l, c;
+   int r, g, b, cr, cg, cb, y1, y2;
+
+   l = height;
+   while (l--) {
+      c = width >> 1;
+      while (c--) {
+         y1 = *src++;
+         cb = ((*src - 128) * 454) >> 8;
+         cg = (*src++ - 128) * 88;
+         y2 = *src++;
+         cr = ((*src - 128) * 359) >> 8;
+         cg = (cg + (*src++ - 128) * 183) >> 8;
+
+         r = y1 + cr;
+         b = y1 + cb;
+         g = y1 - cg;
+         SAT(r);
+         SAT(g);
+         SAT(b);
+
+     *dst++ = b;
+     *dst++ = g;
+     *dst++ = r;
+
+         r = y2 + cr;
+         b = y2 + cb;
+         g = y2 - cg;
+         SAT(r);
+         SAT(g);
+         SAT(b);
+
+     *dst++ = b;
+     *dst++ = g;
+     *dst++ = r;
+      }
+   }
+}
+
+
 void setPointsToFlowPoints(struct flowPoint flow_points[], struct detectedPoint detected_points[], int *flow_point_size, int *count, int MAX_COUNT)
 {
 	// set the points array to match the flow points:
@@ -2259,7 +2311,7 @@ void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int i
 
 	// a) track the points to the new image
 	// b) quality checking  for eliminating points (status / match error / tracking the features back and comparing / etc.)
-	// c) update the points (immediate update / Kalman update)
+	// c) update the points (immediate updatCvtYUYV2Gray(gray_frame, frame, imW, imH); e / Kalman update)
 	int error_opticflow = 0;
 
 	int i;
@@ -2328,6 +2380,143 @@ void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int i
 			flow_points[i].y = flow_points[i].y + flow_points[i].dy;
 		}
 	}
+
+	return;
+}
+
+IplImage *cvGrayImg = 0;
+IplImage *cvPrevGrayImg = 0;
+IplImage *cvImg = 0;
+IplImage *cvPrevImg = 0;
+IplImage *pyramid = 0;
+IplImage *prev_pyramid = 0;
+CvPoint2D32f* points[3];
+int flags = 0;
+char* cv_status = 0;
+int error_opticflow = 1;
+unsigned char *prev_gray_frame = 0;
+unsigned char *gray_frame = 0;
+
+IplImage *swap_temp = 0;
+CvPoint2D32f* swap_points;
+//int saveimg = 1;
+
+void trackPointsCV(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points0[], struct detectedPoint detected_points1[],  int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status)
+{
+
+	// a) track the points to the new image
+	// b) quality checking  for eliminating points (status / match error / tracking the features back and comparing / etc.)
+	// c) update the points (immediate update / Kalman update)
+
+	int i;
+
+	CvMat cv = cvMat(imH, imW, CV_16UC(1), frame);
+	CvMat cvPrev = cvMat(imH, imW, CV_16UC(1), prev_frame);
+	cvImg =  (IplImage*)&cv;
+	cvPrevImg =  (IplImage*)&cvPrev;
+
+	// Convert to gray image
+    if(!cvGrayImg) cvGrayImg = cvCreateImage(cvSize(imW,imH),IPL_DEPTH_8U,1);
+    if(!cvPrevGrayImg) cvPrevGrayImg = cvCreateImage(cvSize(imW,imH),IPL_DEPTH_8U,1);
+    cvConvertScale( cvImg, cvGrayImg, 1.0f/256.0f, 0);
+    cvConvertScale( cvPrevImg, cvPrevGrayImg, 1.0f/256.0f, 0);
+
+//    if(saveimg == 1)
+//    {
+//    	cvSaveImage("/data/video/gray_yuv.jpg",cvGrayImg, 0);
+//    	cvSaveImage("/data/video/yuv.jpg",cvImg, 0);
+//    	saveimg = 0;
+//    }
+
+
+    if(!pyramid)
+    {
+//    	CvSize pyr_sz = cvSize( cvGrayImg->width, cvGrayImg->height );
+    	pyramid = cvCreateImage( cvGetSize(cvGrayImg), IPL_DEPTH_32F, 1 );
+    	prev_pyramid = cvCreateImage( cvGetSize(cvGrayImg), IPL_DEPTH_32F, 1 );
+    	cv_status = (char*) malloc(MAX_COUNT*sizeof(char));
+    	// Allocate feature point buffer (once)
+		points[0]		= (CvPoint2D32f*)cvAlloc(MAX_COUNT*sizeof(points[0][0]));
+		points[1]		= (CvPoint2D32f*)cvAlloc(MAX_COUNT*sizeof(points[0][0]));
+		points[2]		= (CvPoint2D32f*)cvAlloc(MAX_COUNT*sizeof(points[0][0]));
+    }
+
+    for(i = 0; i<*count; i++)
+    {
+    	points[0][i].x = (float)detected_points0[i].x;
+    	points[0][i].y = (float)detected_points0[i].y;
+    	points[1][i].x = (float)detected_points1[i].x;
+    	points[1][i].y = (float)detected_points1[i].y;
+    }
+
+	// a) track the points to the new image
+	if( *count > 0)
+    {
+		cvCalcOpticalFlowPyrLK( cvPrevGrayImg, cvGrayImg, prev_pyramid, pyramid,
+			points[0], points[1], *count, cvSize(5,5), 3, cv_status, 0,					// points[0]: prev_features
+			cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10, 0.03), flags );	// points[1]: curr_features
+		flags |= 1;
+		error_opticflow = 0;
+    }
+
+	if(error_opticflow == 0)
+	{
+		// b) quality checking  for eliminating points (status / match error / tracking the features back and comparing / etc.)
+		int remove_point = 0;
+		int c;
+		for(i = *flow_point_size-1; i >= 0; i-- )
+	    {
+	        if(!cv_status[i])
+			{
+				remove_point = 1;
+			}
+
+			// error[i] can also be used, etc.
+
+			if(remove_point)
+			{
+				// we now erase the point if it is not observed in the new image
+				// later we may count it as a single miss, allowing for a few misses
+				for(c = i; c < *flow_point_size-1; c++)
+				{
+					flow_points[c].x = flow_points[c+1].x;
+					flow_points[c].y = flow_points[c+1].y;
+					flow_points[c].prev_x= flow_points[c+1].prev_x;
+					flow_points[c].prev_y = flow_points[c+1].prev_y;
+					flow_points[c].dx = flow_points[c+1].dx;
+					flow_points[c].dy = flow_points[c+1].dy;
+					flow_points[c].new_dx = flow_points[c+1].new_dx;
+					flow_points[c].new_dy = flow_points[c+1].new_dy;
+				}
+				(*flow_point_size)--;
+			}
+			else
+			{
+				flow_points[i].new_dx = points[1][i].x - points[0][i].x;
+				flow_points[i].new_dy = points[1][i].y - points[0][i].y;
+			}
+		}
+
+		// c) update the points (immediate update / Kalman update)
+		*count = *flow_point_size;
+
+		for(i = 0; i < *count; i++)
+		{
+			// immediate update:
+			flow_points[i].dx = flow_points[i].new_dx;
+			flow_points[i].dy = flow_points[i].new_dy;
+			flow_points[i].prev_x = flow_points[i].x;
+			flow_points[i].prev_y = flow_points[i].y;
+			flow_points[i].x = flow_points[i].x + flow_points[i].dx;
+			flow_points[i].y = flow_points[i].y + flow_points[i].dy;
+		}
+	}
+
+    for(i = 0; i<*count; i++)
+    {
+    	detected_points1[i].x = points[1][i].x;
+    	detected_points1[i].y = points[1][i].y;
+    }
 
 	return;
 }
