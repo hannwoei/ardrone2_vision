@@ -6,6 +6,7 @@
 #include "defs_and_types.h"
 #include "nrutil.h"
 #include "opticflow/fastRosten.h"
+#include "../../modules/OpticFlow/opticflow_module.h"
 
 //OpenCV
 #include <opencv2/core/core_c.h>
@@ -2000,6 +2001,213 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		free(sample_indices);
 //printf("stop8\n");
 }
+
+void fitLinearFlowFieldCV(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold, int *n_inlier_minu, int *n_inlier_minv)
+{
+		CvMat Maa, Mbu_all, Mbv_all, Ma, Mbu, Mbv, Mpu, Mpv;
+		int *sample_indices;
+		float *A, *bu, *bv, *AA, *bu_all, *bv_all;
+		sample_indices =(int *) calloc(n_samples,sizeof(int));
+		A = (float *) calloc(n_samples*3,sizeof(float));// A1 is a N x 3 matrix with rows [x, y, 1]
+		bu = (float *) calloc(n_samples,sizeof(float)); // bu is a N x 1 vector with elements dx (or dy)
+		bv = (float *) calloc(n_samples,sizeof(float)); // bv is a N x 1 vector with elements dx (or dy)
+		AA = (float *) calloc(count*3,sizeof(float));   // AA contains all points with rows [x, y, 1]
+		bu_all = (float *) calloc(count,sizeof(float)); // bu is a N x 1 vector with elements dx (or dy)
+		bv_all = (float *) calloc(count,sizeof(float)); // bv is a N x 1 vector with elements dx (or dy)
+		int si, add_si, p, i_rand, sam;
+		pu[0] = 0.0f; pu[1] = 0.0f; pu[2] = 0.0f;
+		pv[0] = 0.0f; pv[1] = 0.0f; pv[2] = 0.0f;
+		//		int n_inliers;
+		float * PU, * errors_pu, * PV, * errors_pv;
+		int * n_inliers_pu, * n_inliers_pv;
+		PU = (float *) calloc(n_iterations*3,sizeof(float));
+		PV = (float *) calloc(n_iterations*3,sizeof(float));
+		errors_pu = (float *) calloc(n_iterations,sizeof(float));
+		errors_pv = (float *) calloc(n_iterations,sizeof(float));
+		n_inliers_pu = (int *) calloc(n_iterations,sizeof(int));
+		n_inliers_pv = (int *) calloc(n_iterations,sizeof(int));
+
+		// initialize matrices and vectors for the full point set problem:
+		// this is used for determining inliers
+		for(sam = 0; sam < count; sam++)
+		{
+			AA[sam*3] = (float) x[sam];
+			AA[sam*3+1] = (float) y[sam];
+			AA[sam*3+2] = 1.0;
+			bu_all[sam] = (float) dx[sam];
+			bv_all[sam] = (float) dy[sam];
+		}
+		cvInitMatHeader(&Maa, count, 3, CV_32FC1, AA, CV_AUTOSTEP);
+		cvInitMatHeader(&Mbu_all, count, 1, CV_32FC1, bu_all, CV_AUTOSTEP);
+		cvInitMatHeader(&Mbv_all, count, 1, CV_32FC1, bv_all, CV_AUTOSTEP);
+
+		// perform RANSAC:
+		int it, ii;
+		for(it = 0; it < n_iterations; it++)
+		{
+			// select a random sample of n_sample points:
+			memset(sample_indices, 0, n_samples*sizeof(int));
+			i_rand = 0;
+//printf("stop1\n");
+			while(i_rand < n_samples)
+			{
+				si = rand() % count;
+				add_si = 1;
+				for(ii = 0; ii < i_rand; ii++)
+				{
+					if(sample_indices[ii] == si) add_si = 0;
+				}
+				if(add_si)
+				{
+					sample_indices[i_rand] = si;
+					i_rand ++;
+				}
+			}
+//printf("stop2\n");
+			// Setup the system:
+			for(sam = 0; sam < n_samples; sam++)
+			{
+				A[sam*3] = (float) x[sample_indices[sam]];
+				A[sam*3+1] = (float) y[sample_indices[sam]];
+				A[sam*3+2] = 1.0;
+				bu[sam] = (float) dx[sample_indices[sam]];
+				bv[sam] = (float) dy[sample_indices[sam]];
+				//printf("%d,%d,%d,%d,%d\n",A[sam][0],A[sam][1],A[sam][2],bu[sam],bv[sam]);
+			}
+//printf("stop3\n");
+			// Solve the small system:
+			cvInitMatHeader(&Ma, n_samples, 3, CV_32FC1, A, CV_AUTOSTEP);
+
+			// for horizontal flow:
+			cvInitMatHeader(&Mbu, n_samples, 1, CV_32FC1, bu, CV_AUTOSTEP);
+			cvInitMatHeader(&Mpu, 3, 1, CV_32FC1, pu, CV_AUTOSTEP );
+			cvSolve(&Ma, &Mbu, &Mpu,  CV_SVD);
+
+			// for vertical flow:
+			cvInitMatHeader(&Mbv, n_samples, 1, CV_32FC1, bv, CV_AUTOSTEP);
+			cvInitMatHeader(&Mpv, 3, 1, CV_32FC1, pv, CV_AUTOSTEP );
+			cvSolve(&Ma, &Mbv, &Mpv,  CV_SVD);
+
+			// for horizontal flow:
+			PU[it*3] = pu[0];
+			PU[it*3+1] = pu[1];
+			PU[it*3+2] = pu[2];
+
+			// for vertical flow:
+			PV[it*3] = pv[0];
+			PV[it*3+1] = pv[1];
+			PV[it*3+2] = pv[2];
+
+//printf("stop4\n");
+			// count inliers and determine their error:
+			errors_pu[it] = 0;
+			errors_pv[it] = 0;
+			n_inliers_pu[it] = 0;
+			n_inliers_pv[it] = 0;
+
+//			// for horizontal flow:
+			CvMat *bb = cvCreateMat(count, 1, CV_32FC1);
+			cvMatMul(&Maa, &Mpu, bb);
+			CvMat *C = cvCreateMat(count, 1, CV_32FC1);
+			cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbu_all,  C);
+
+			for(p = 0; p < count; p++)
+			{
+				if(C->data.db[p] < error_threshold)
+				{
+					errors_pu[it] += abs(C->data.db[p]);
+					n_inliers_pu[it]++;
+				}
+			}
+			// for vertical flow:
+			cvMatMul(&Maa, &Mpv, bb);
+			cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbv_all,  C);
+			for(p = 0; p < count; p++)
+			{
+				if(C->data.db[p] < error_threshold)
+				{
+					errors_pv[it] += abs(C->data.db[p]);
+					n_inliers_pv[it]++;
+				}
+			}
+		}
+//printf("stop5\n");
+
+		// select the parameters with lowest error:
+		// for horizontal flow:
+		int param;
+		int min_ind = 0;
+		*min_error_u = (float)errors_pu[0];
+		for(it = 1; it < n_iterations; it++)
+		{
+			if(errors_pu[it] < *min_error_u)
+			{
+				*min_error_u = (float)errors_pu[it];
+				min_ind = it;
+			}
+		}
+		for(param = 0; param < 3; param++)
+		{
+			pu[param] = PU[min_ind*3+param];
+		}
+		//printf("pu_sel=%f,%f,%f\n",pu[0],pu[1],pu[2]);
+		// for vertical flow:
+		min_ind = 0;
+		*min_error_v = (float)errors_pv[0];
+
+		for(it = 0; it < n_iterations; it++)
+		{
+			if(errors_pv[it] < *min_error_v)
+			{
+				*min_error_v = (float)errors_pv[it];
+				min_ind = it;
+			}
+		}
+		for(param = 0; param < 3; param++)
+		{
+			pv[param] = PV[min_ind*3+param];
+		}
+		*n_inlier_minu = n_inliers_pu[min_ind];
+		*n_inlier_minv = n_inliers_pv[min_ind];
+//printf("stop6\n");
+		// error has to be determined on the entire set:
+		CvMat *bb = cvCreateMat(count, 1, CV_32FC1);
+		cvMatMul(&Maa, &Mpu, bb);
+		CvMat *C = cvCreateMat(count, 1, CV_32FC1);
+		cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbu_all,  C);
+		*min_error_u = 0;
+		for(p = 0; p < count; p++)
+		{
+			*min_error_u += abs(C->data.db[p]);
+		}
+		cvMatMul(&Maa, &Mpv, bb);
+		cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbv_all,  C);
+		*min_error_v = 0;
+		for(p = 0; p < count; p++)
+		{
+			*min_error_v += abs(C->data.db[p]);
+		}
+		*divergence_error = (*min_error_u + *min_error_v) / (2 * count);
+
+		// delete allocated dynamic arrays
+//printf("stop7\n");
+		free(A);
+		free(AA);
+		free(PU);
+		free(PV);
+		free(n_inliers_pu);
+		free(n_inliers_pv);
+		free(errors_pu);
+		free(errors_pv);
+		free(bu);
+		free(bv);
+		free(bu_all);
+		free(bv_all);
+		free(sample_indices);
+//printf("stop8\n");
+}
+
+
 unsigned int mov_block = 6;
 float div_buf[6];
 unsigned int div_point = 0;
@@ -2026,7 +2234,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		}
 
 		// also adjust the divergence to the number of frames:
-//		*divergence = *divergence * FPS;
+		*divergence = *divergence * FPS;
 //		*divergence = *divergence * 60;
 
 		// translation orthogonal to the camera axis:
@@ -2036,7 +2244,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 
 		//apply a moving average
 		int medianfilter = 0;
-		int averagefilter = 1;
+		int averagefilter = 0;
 		float div_avg = 0.0f;
 
 		if(averagefilter == 1)
@@ -2509,6 +2717,12 @@ void trackPointsCV(unsigned char *frame, unsigned char *prev_frame, int imW, int
 			flow_points[i].prev_y = flow_points[i].y;
 			flow_points[i].x = flow_points[i].x + flow_points[i].dx;
 			flow_points[i].y = flow_points[i].y + flow_points[i].dy;
+			x[i] = flow_points[i].prev_x;
+			y[i] = flow_points[i].prev_y;
+			new_x[i] = flow_points[i].x;
+			new_y[i] = flow_points[i].y;
+			dx[i] = flow_points[i].dx;
+			dy[i] = flow_points[i].dy;
 		}
 	}
 
@@ -2547,6 +2761,36 @@ void analyseTTI(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inli
 		fitLinearFlowField(pu, pv, &divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
 		extractInformationFromLinearFlowField(divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imW, imH, 60);
+
+//		printf("0:%d\n1:%f\n",count,divergence[0]);
+}
+
+void analyseTTICV(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH)
+{
+		// linear fit of the optic flow field
+		float error_threshold = 10; // 10
+		int n_iterations = 20; // 40
+
+		int n_samples = (count < 5) ? count : 5;
+		float mean_tti, median_tti, d_heading, d_pitch;
+
+		// minimum = 3
+		if(n_samples < 3)
+		{
+			// set dummy values for tti, etc.
+			mean_tti = 1000.0f / 60;
+			median_tti = mean_tti;
+			d_heading = 0;
+			d_pitch = 0;
+			return;
+		}
+		float pu[3], pv[3];
+
+		float divergence_error;
+		float min_error_u, min_error_v;
+		fitLinearFlowFieldCV(pu, pv, &divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
+
+		extractInformationFromLinearFlowField(divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imW, imH, FPS);
 
 //		printf("0:%d\n1:%f\n",count,divergence[0]);
 }

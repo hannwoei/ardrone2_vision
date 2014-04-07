@@ -7,6 +7,7 @@
 #include "opticflow/optic_flow_gdc.h"
 #include "trig.h"
 #include "opticflow/fastRosten.h"
+#include "opticflow_module.h"
 
 // Own Header
 #include "opticflow_code.h"
@@ -51,7 +52,6 @@ unsigned int buf_opt_trans_point;
 
 int *x, *y, *new_x, *new_y, *status, *dx, *dy, *dx_scaled, *dy_scaled, *n_inlier_minu, *n_inlier_minv, *active;
 float divergence;
-float FPS = 60;
 int error_corner, error_opticflow, mark_points;
 
 // Corner Detection
@@ -136,7 +136,7 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
     if(count)
     {
-    	unsigned int USE_OPENCV = 1;
+    	unsigned int USE_OPENCV = 0;
     	if(USE_OPENCV)
     	{
     		trackPointsCV(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points,&flow_point_size, detected_points0, detected_points1, x, y, new_x, new_y, dx, dy, status);
@@ -184,14 +184,21 @@ void my_plugin_run(unsigned char *frame)
 		opt_angle_y_raw = y_avg;
 
 		//tele purpose
-int diff_roll, diff_pitch, mean_alt;
-float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error;
+		int diff_roll, diff_pitch, mean_alt;
+		float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error;
 
-		int USE_FITTING = 0;
+		int USE_FITTING = 1;
 
 		if(USE_FITTING == 1)
 		{
-			analyseTTI(&divergence, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight);
+			if(USE_OPENCV)
+			{
+				analyseTTICV(&divergence, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight);
+			}
+			else
+			{
+				analyseTTI(&divergence, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight);
+			}
 		}
 
 		// *********************************************
