@@ -40,5 +40,6 @@ extern void opticflow_module_init(void);
 extern void opticflow_module_run(void);
 extern void opticflow_module_start(void);
 extern void opticflow_module_stop(void);
+extern volatile float FPS;
 
 #endif /* OPTICFLOW_LAND_H */
