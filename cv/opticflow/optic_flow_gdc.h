@@ -62,6 +62,6 @@ void setPointsToFlowPoints(struct flowPoint flow_points[], struct detectedPoint 
 void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[]);
 void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
 void trackPointsCV(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points0[], struct detectedPoint detected_points1[],  int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
-void analyseTTI(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH);
-void analyseTTICV(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size);
+void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH);
+void analyseTTICV(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size);
 #endif

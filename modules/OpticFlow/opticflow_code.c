@@ -193,11 +193,11 @@ void my_plugin_run(unsigned char *frame)
 		{
 			if(USE_OPENCV)
 			{
-				analyseTTICV(&divergence, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, flow_point_size);
+				analyseTTICV(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, flow_point_size);
 			}
 			else
 			{
-				analyseTTI(&divergence, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight);
+				analyseTTI(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight);
 			}
 		}
 

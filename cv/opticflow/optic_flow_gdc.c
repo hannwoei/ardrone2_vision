@@ -2223,7 +2223,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 {
 		// divergence:
 
-		*divergence = (float)(pu[0] + pv[1]);
+		*divergence = pu[0] + pv[1];
 //printf("div = %f\n",*divergence);
 		// minimal measurable divergence:
 		float minimal_divergence = 2E-3;
@@ -2231,12 +2231,12 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		{
 			*mean_tti = 2.0f / *divergence;
 			if(FPS > 1E-3) *mean_tti /= FPS;
-			else *mean_tti = (float)((2.0f / minimal_divergence) / FPS);
+			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
 			*median_tti = *mean_tti;
 		}
 		else
 		{
-			*mean_tti = (float)((2.0f / minimal_divergence) / FPS);
+			*mean_tti = ((2.0f / minimal_divergence) / FPS);
 			*median_tti = *mean_tti;
 		}
 
@@ -2246,8 +2246,8 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 
 		// translation orthogonal to the camera axis:
 		// flow in the center of the image:
-		*d_heading = (float)(-(pu[2] + (imgWidth/2.0f) * pu[0] + (imgHeight/2.0f) * pu[1]));
-		*d_pitch = (float)(-(pv[2] + (imgWidth/2.0f) * pv[0] + (imgHeight/2.0f) * pv[1]));
+		*d_heading = (-(pu[2] + (imgWidth/2.0f) * pu[0] + (imgHeight/2.0f) * pu[1]));
+		*d_pitch = (-(pv[2] + (imgWidth/2.0f) * pv[0] + (imgHeight/2.0f) * pv[1]));
 
 		//apply a moving average
 		int medianfilter = 0;
@@ -2747,37 +2747,36 @@ void trackPointsCV(unsigned char *frame, unsigned char *prev_frame, int imW, int
 	return;
 }
 
-void analyseTTI(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH)
+void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH)
 {
 		// linear fit of the optic flow field
 		float error_threshold = 10; // 10
 		int n_iterations = 20; // 40
 
 		int n_samples = (count < 5) ? count : 5;
-		float mean_tti, median_tti, d_heading, d_pitch;
 
 		// minimum = 3
 		if(n_samples < 3)
 		{
 			// set dummy values for tti, etc.
-			mean_tti = 1000.0f / 60;
-			median_tti = mean_tti;
-			d_heading = 0;
-			d_pitch = 0;
+			*mean_tti = 1000.0f / 60;
+			*median_tti = *mean_tti;
+			*d_heading = 0;
+			*d_pitch = 0;
 			return;
 		}
 		float pu[3], pv[3];
 
-		float divergence_error;
+		//float divergence_error;
 		float min_error_u, min_error_v;
-		fitLinearFlowField(pu, pv, &divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
+		fitLinearFlowField(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
-		extractInformationFromLinearFlowField(divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imW, imH, 60);
+		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, FPS);
 
 //		printf("0:%d\n1:%f\n",count,divergence[0]);
 }
 
-void analyseTTICV(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size)
+void analyseTTICV(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size)
 {
 		// linear fit of the optic flow field
 		float error_threshold = 10; // 10
@@ -2785,25 +2784,24 @@ void analyseTTICV(float *divergence, int *x, int *y, int *dx, int *dy, int *n_in
 
 		int n_samples = (count < 5) ? count : 5;
 		count = flow_point_size;
-		float mean_tti, median_tti, d_heading, d_pitch;
 
 		// minimum = 3
 		if(n_samples < 3)
 		{
 			// set dummy values for tti, etc.
-			mean_tti = 1000.0f / 60;
-			median_tti = mean_tti;
-			d_heading = 0;
-			d_pitch = 0;
+			*mean_tti = 1000.0f / 60;
+			*median_tti = *mean_tti;
+			*d_heading = 0;
+			*d_pitch = 0;
 			return;
 		}
 		float pu[3], pv[3];
 
-		float divergence_error;
+		//float divergence_error;
 		float min_error_u, min_error_v;
-		fitLinearFlowFieldCV(pu, pv, &divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
+		fitLinearFlowFieldCV(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
-		extractInformationFromLinearFlowField(divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, pu, pv, imW, imH, FPS);
+		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, FPS);
 
 //		printf("0:%d\n1:%f\n",count,divergence[0]);
 }
