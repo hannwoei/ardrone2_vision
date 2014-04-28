@@ -47,11 +47,11 @@ int getSumPatch(int* Patch, int size);
 void showFlow(unsigned char * frame_buf, int* x, int* y, int* status, int n_found_points, int* new_x, int* new_y, int imgW, int imgH);
 int opticFlowLK(unsigned char * new_image_buf, unsigned char * old_image_buf, int* p_x, int* p_y, int n_found_points, int imW, int imH, int* new_x, int* new_y, int* status, int half_window_size, int max_iterations);
 void MatMul(float* Mat1, float* Mat2, float* Mat3, int MatW, int MatH);
-void MatVVMul(float* MVec, int** Mat, float* Vec, int MatW, int MatH);
-void ScaleAdd(float* Mat3, float* Mat1, float Scale, int* Mat2, int MatW, int MatH);
+void MatVVMul(float* MVec, float** Mat, float* Vec, int MatW, int MatH);
+void ScaleAdd(float* Mat3, float* Mat1, float Scale, float* Mat2, int MatW, int MatH);
 int dsvd(float **a, int m, int n, float *w, float **v);
 void svbksb(float **u, float *w, float **v, int m, int n, float *b, float *x);
-void svdSolve(float *x_svd, int **u, int m, int n, int *b);
+void svdSolve(float *x_svd, float **u, int m, int n, float *b);
 void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold, int *n_inlier_minu, int *n_inlier_minv);
 void fitLinearFlowFieldCV(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold, int *n_inlier_minu, int *n_inlier_minv);
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS);
@@ -63,5 +63,5 @@ void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int im
 void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
 void trackPointsCV(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points0[], struct detectedPoint detected_points1[],  int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
 void analyseTTI(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH);
-void analyseTTICV(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH);
+void analyseTTICV(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size);
 #endif

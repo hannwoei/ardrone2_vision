@@ -124,7 +124,7 @@ void my_plugin_run(unsigned char *frame)
     }
     else
     {
-    	int threshold_n_points = 25;
+    	int threshold_n_points = 16; //25
     	if(flow_point_size < threshold_n_points)
     	{
     		findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
@@ -193,7 +193,7 @@ void my_plugin_run(unsigned char *frame)
 		{
 			if(USE_OPENCV)
 			{
-				analyseTTICV(&divergence, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight);
+				analyseTTICV(&divergence, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, flow_point_size);
 			}
 			else
 			{

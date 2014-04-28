@@ -195,7 +195,7 @@ void *computervision_thread_main(void* data)
     // FPS
 	timestamp = end_timer();
 	FPS = (float) 1000000/(float)timestamp;
-	printf("dt = %d, FPS = %f\n",timestamp, FPS);
+//	printf("dt = %d, FPS = %f\n",timestamp, FPS);
 	start_timer();
 
     // Process

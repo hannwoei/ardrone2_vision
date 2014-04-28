@@ -1367,7 +1367,7 @@ void MatMul(float* Mat3, float* Mat1, float* Mat2, int MatW, int MatH)
   }
 }
 
-void MatVVMul(float* MVec, int** Mat, float* Vec, int MatW, int MatH)
+void MatVVMul(float* MVec, float** Mat, float* Vec, int MatW, int MatH)
 {
   unsigned int i;
   unsigned int j;
@@ -1376,12 +1376,12 @@ void MatVVMul(float* MVec, int** Mat, float* Vec, int MatW, int MatH)
   {
     for(j = 0; j < MatW; j++)
     {
-    	MVec[i] += ((float) Mat[i][j]) * Vec[j];
+    	MVec[i] += Mat[i][j] * Vec[j];
     }
   }
 }
 
-void ScaleAdd(float* Mat3, float* Mat1, float Scale, int* Mat2, int MatW, int MatH)
+void ScaleAdd(float* Mat3, float* Mat1, float Scale, float* Mat2, int MatW, int MatH)
 {
   unsigned int i;
   unsigned int j;
@@ -1392,7 +1392,7 @@ void ScaleAdd(float* Mat3, float* Mat1, float Scale, int* Mat2, int MatW, int Ma
     for(j = 0; j < MatH; j++)
     {
       ii = (j * MatW + i);
-      Mat3[ii] = Scale*((float) Mat1[ii]) + Mat2[ii];
+      Mat3[ii] = Scale*Mat1[ii] + Mat2[ii];
     }
   }
 }
@@ -1708,7 +1708,7 @@ void svbksb(float **u, float *w, float **v, int m, int n, float *b, float *x)
 	free_vector(tmp, 1, n);
 }
 
-void svdSolve(float *x_svd, int **u, int m, int n, int *b)
+void svdSolve(float *x_svd, float **u, int m, int n, float *b)
 {
 	// SVD
 	int i, j;
@@ -1724,10 +1724,10 @@ void svdSolve(float *x_svd, int **u, int m, int n, int *b)
 	for(ii=0; ii<m; ii++)
 	{
 		u_copy[ii] = (float *)malloc(n*sizeof(float));
-		u_copy[ii][0] = (float) u[ii][0];
-		u_copy[ii][1] = (float) u[ii][1];
-		u_copy[ii][2] = (float) u[ii][2];
-		b_copy[ii] = (float) b[ii];
+		u_copy[ii][0] = u[ii][0];
+		u_copy[ii][1] = u[ii][1];
+		u_copy[ii][2] = u[ii][2];
+		b_copy[ii] =  b[ii];
 		//printf("%d,%f,%f,%f,%f\n",ii,u_copy[ii][0] ,u_copy[ii][1] ,u_copy[ii][2] ,b_copy[ii]);
 	}
 //printf("svdSolve stop 1\n");
@@ -1781,16 +1781,17 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 //		printf("%d_%d, ",dx[i],dy[i]);
 //	}
 //	printf("\n");
-		int *sample_indices, **A, *bu, *bv, **AA, *bu_all, *bv_all;
+		int *sample_indices;
+		float **A, *bu, *bv, **AA, *bu_all, *bv_all;
 		sample_indices =(int *) calloc(n_samples,sizeof(int));
-		A = (int **) calloc(n_samples,sizeof(int*));// A1 is a N x 3 matrix with rows [x, y, 1]
-		bu = (int *) calloc(n_samples,sizeof(int)); // bu is a N x 1 vector with elements dx (or dy)
-		bv = (int *) calloc(n_samples,sizeof(int)); // bv is a N x 1 vector with elements dx (or dy)
-		AA = (int **) calloc(count,sizeof(int*));   // AA contains all points with rows [x, y, 1]
-		bu_all = (int *) calloc(count,sizeof(int)); // bu is a N x 1 vector with elements dx (or dy)
-		bv_all = (int *) calloc(count,sizeof(int)); // bv is a N x 1 vector with elements dx (or dy)
+		A = (float **) calloc(n_samples,sizeof(float*));// A1 is a N x 3 matrix with rows [x, y, 1]
+		bu = (float *) calloc(n_samples,sizeof(float)); // bu is a N x 1 vector with elements dx (or dy)
+		bv = (float *) calloc(n_samples,sizeof(float)); // bv is a N x 1 vector with elements dx (or dy)
+		AA = (float **) calloc(count,sizeof(float*));   // AA contains all points with rows [x, y, 1]
+		bu_all = (float *) calloc(count,sizeof(float)); // bu is a N x 1 vector with elements dx (or dy)
+		bv_all = (float *) calloc(count,sizeof(float)); // bv is a N x 1 vector with elements dx (or dy)
 		int si, add_si, p, i_rand, sam;
-		for(sam = 0; sam < n_samples; sam++) A[sam] = (int *) calloc(3,sizeof(int));
+		for(sam = 0; sam < n_samples; sam++) A[sam] = (float *) calloc(3,sizeof(float));
 		pu[0] = 0.0f; pu[1] = 0.0f; pu[2] = 0.0f;
 		pv[0] = 0.0f; pv[1] = 0.0f; pv[2] = 0.0f;
 		//		int n_inliers;
@@ -1811,12 +1812,12 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		// this is used for determining inliers
 		for(sam = 0; sam < count; sam++)
 		{
-			AA[sam] = (int *) calloc(3,sizeof(int));
-			AA[sam][0] = x[sam];
-			AA[sam][1] = y[sam];
-			AA[sam][2] = 1;
-			bu_all[sam] = dx[sam];
-			bv_all[sam] = dy[sam];
+			AA[sam] = (float *) calloc(3,sizeof(float));
+			AA[sam][0] = (float) x[sam];
+			AA[sam][1] = (float) y[sam];
+			AA[sam][2] = 1.0f;
+			bu_all[sam] = (float) dx[sam];
+			bv_all[sam] = (float) dy[sam];
 		}
 
 		// perform RANSAC:
@@ -1845,11 +1846,11 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			// Setup the system:
 			for(sam = 0; sam < n_samples; sam++)
 			{
-				A[sam][0] = x[sample_indices[sam]];
-				A[sam][1] = y[sample_indices[sam]];
-				A[sam][2] = 1;
-				bu[sam] = dx[sample_indices[sam]];
-				bv[sam] = dy[sample_indices[sam]];
+				A[sam][0] = (float) x[sample_indices[sam]];
+				A[sam][1] = (float) y[sample_indices[sam]];
+				A[sam][2] = 1.0f;
+				bu[sam] = (float) dx[sample_indices[sam]];
+				bv[sam] = (float) dy[sample_indices[sam]];
 				//printf("%d,%d,%d,%d,%d\n",A[sam][0],A[sam][1],A[sam][2],bu[sam],bv[sam]);
 			}
 //printf("stop3\n");
@@ -2006,8 +2007,8 @@ void fitLinearFlowFieldCV(float* pu, float* pv, float* divergence_error, int *x,
 {
 		CvMat Maa, Mbu_all, Mbv_all, Ma, Mbu, Mbv, Mpu, Mpv;
 		int *sample_indices;
-		float *A, *bu, *bv, *AA, *bu_all, *bv_all;
 		sample_indices =(int *) calloc(n_samples,sizeof(int));
+		float *A, *bu, *bv, *AA, *bu_all, *bv_all;
 		A = (float *) calloc(n_samples*3,sizeof(float));// A1 is a N x 3 matrix with rows [x, y, 1]
 		bu = (float *) calloc(n_samples,sizeof(float)); // bu is a N x 1 vector with elements dx (or dy)
 		bv = (float *) calloc(n_samples,sizeof(float)); // bv is a N x 1 vector with elements dx (or dy)
@@ -2113,23 +2114,29 @@ void fitLinearFlowFieldCV(float* pu, float* pv, float* divergence_error, int *x,
 
 			for(p = 0; p < count; p++)
 			{
+
 				if(C->data.db[p] < error_threshold)
 				{
+					printf("pu_c = %f, ", C->data.db[p]);
 					errors_pu[it] += abs(C->data.db[p]);
 					n_inliers_pu[it]++;
 				}
 			}
+			printf("\n");
 			// for vertical flow:
 			cvMatMul(&Maa, &Mpv, bb);
 			cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbv_all,  C);
 			for(p = 0; p < count; p++)
 			{
+
 				if(C->data.db[p] < error_threshold)
 				{
+					printf("pv_c = %f, ", C->data.db[p]);
 					errors_pv[it] += abs(C->data.db[p]);
 					n_inliers_pv[it]++;
 				}
 			}
+			printf("\n");
 		}
 //printf("stop5\n");
 
@@ -2244,7 +2251,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 
 		//apply a moving average
 		int medianfilter = 0;
-		int averagefilter = 0;
+		int averagefilter = 1;
 		float div_avg = 0.0f;
 
 		if(averagefilter == 1)
@@ -2258,8 +2265,8 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 			for (im=0;im<mov_block;im++) {
 				div_avg+=div_buf[im];
 			}
-//			*divergence = div_avg/ mov_block;
-			*divergence = div_avg;
+			*divergence = div_avg/ mov_block;
+//			*divergence = div_avg;
 		}
 		else if(medianfilter == 1)
 		{
@@ -2732,6 +2739,11 @@ void trackPointsCV(unsigned char *frame, unsigned char *prev_frame, int imW, int
     	detected_points1[i].y = points[1][i].y;
     }
 
+	// *********************************************
+	// (5) housekeeping to prepare for the next call
+	// *********************************************
+    CV_SWAP(prev_pyramid, pyramid, swap_temp);
+
 	return;
 }
 
@@ -2765,13 +2777,14 @@ void analyseTTI(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inli
 //		printf("0:%d\n1:%f\n",count,divergence[0]);
 }
 
-void analyseTTICV(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH)
+void analyseTTICV(float *divergence, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size)
 {
 		// linear fit of the optic flow field
 		float error_threshold = 10; // 10
 		int n_iterations = 20; // 40
 
 		int n_samples = (count < 5) ? count : 5;
+		count = flow_point_size;
 		float mean_tti, median_tti, d_heading, d_pitch;
 
 		// minimum = 3
