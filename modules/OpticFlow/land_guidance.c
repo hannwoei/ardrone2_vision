@@ -61,8 +61,8 @@ struct LandGuidanceStruct land_guidance_data;
 
 int32_t vision_pgain;
 int32_t vision_dgain;
-int32_t vision_land_pgain;
-int32_t vision_land_dgain;
+float vision_land_pgain;
+float vision_land_dgain;
 int OF_x;
 int OF_y;
 int OF_dx;

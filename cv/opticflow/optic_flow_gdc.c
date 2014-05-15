@@ -2215,9 +2215,19 @@ void fitLinearFlowFieldCV(float* pu, float* pv, float* divergence_error, int *x,
 }
 
 
-unsigned int mov_block = 30;
+unsigned int mov_block = 30; //default: 30
 float div_buf[30];
 unsigned int div_point = 0;
+float OFS_BUTTER_NUM_1 = 0.0004260;
+float OFS_BUTTER_NUM_2 = 0.0008519;
+float OFS_BUTTER_NUM_3 = 0.0004260;
+float OFS_BUTTER_DEN_2 = -1.9408;
+float OFS_BUTTER_DEN_3 = 0.9425;
+float ofs_meas_dx_prev = 0.0;
+float ofs_meas_dx_prev_prev = 0.0;
+float ofs_filter_val_dx_prev = 0.0;
+float ofs_filter_val_dx_prev_prev = 0.0;
+float temp_divergence = 0.0;
 
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS)
 {
@@ -2281,7 +2291,12 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		}
 		else if(butterworthfilter == 1)
 		{
-
+			temp_divergence = *divergence;
+			*divergence = OFS_BUTTER_NUM_1* (*divergence) + OFS_BUTTER_NUM_2*ofs_meas_dx_prev+ OFS_BUTTER_NUM_3*ofs_meas_dx_prev_prev- OFS_BUTTER_DEN_2*ofs_filter_val_dx_prev- OFS_BUTTER_DEN_3*ofs_filter_val_dx_prev_prev;
+		    ofs_meas_dx_prev_prev = ofs_meas_dx_prev;
+		    ofs_meas_dx_prev = temp_divergence;
+		    ofs_filter_val_dx_prev_prev = ofs_filter_val_dx_prev;
+		    ofs_filter_val_dx_prev = *divergence;
 		}
 
 /*
