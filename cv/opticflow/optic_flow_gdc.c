@@ -2215,8 +2215,8 @@ void fitLinearFlowFieldCV(float* pu, float* pv, float* divergence_error, int *x,
 }
 
 
-unsigned int mov_block = 6;
-float div_buf[6];
+unsigned int mov_block = 30;
+float div_buf[30];
 unsigned int div_point = 0;
 
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS)
@@ -2241,8 +2241,8 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		}
 
 		// also adjust the divergence to the number of frames:
-		*divergence = *divergence * FPS;
-//		*divergence = *divergence * 60;
+//		*divergence = *divergence * FPS;
+		*divergence = *divergence * 60;
 
 		// translation orthogonal to the camera axis:
 		// flow in the center of the image:
@@ -2252,11 +2252,12 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		//apply a moving average
 		int medianfilter = 0;
 		int averagefilter = 1;
+		int butterworthfilter = 0;
 		float div_avg = 0.0f;
 
 		if(averagefilter == 1)
 		{
-			if (*divergence < 10.0 && *divergence > -10.0) {
+			if (*divergence < 3.0 && *divergence > -3.0) {
 				div_buf[div_point] = *divergence;
 				div_point = (div_point+1) %mov_block; // index starts from 0 to mov_block
 			}
@@ -2271,12 +2272,16 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		else if(medianfilter == 1)
 		{
 			//apply a median filter
-			if (*divergence < 10.0 && *divergence > -10.0) {
+			if (*divergence < 3.0 && *divergence > -3.0) {
 				div_buf[div_point] = *divergence;
 				div_point = (div_point+1) %mov_block;
 			}
-			quick_sort(div_buf,div_point);
-			*divergence  = div_buf[div_point/2];
+			quick_sort(div_buf,mov_block);
+			*divergence  = div_buf[mov_block/2];
+		}
+		else if(butterworthfilter == 1)
+		{
+
 		}
 
 /*
@@ -2460,7 +2465,7 @@ void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int im
 //		memcpy(prev_gray_frame,gray_frame,imgHeight*imgWidth);
 //	}
 
-	pnts_fast = fast9_detect((const byte*)gray_frame, imW, imH, imW, fast_threshold, count);
+	pnts_fast = fast9_detect((const byte*)gray_frame, imW, imH, imW, fast_threshold, count); //widthstep for gray-scaled image = its width; int widthstep = ((width*sizeof(unsigned char)*nchannels)%4!=0)?((((width*sizeof(unsigned char)*nchannels)/4)*4) + 4):(width*sizeof(unsigned char)*nchannels);
 
 	// transform the points to the format we need (is also done in the other corner finders
 	*count = (*count > MAX_COUNT) ? MAX_COUNT : *count;

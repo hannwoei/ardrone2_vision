@@ -124,7 +124,7 @@ void my_plugin_run(unsigned char *frame)
     }
     else
     {
-    	int threshold_n_points = 16; //25
+    	int threshold_n_points = 25; //25
     	if(flow_point_size < threshold_n_points)
     	{
     		findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);

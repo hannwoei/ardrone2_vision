@@ -72,6 +72,9 @@ int OF_y_prev;
 
 int USE_TRANSLATIONAL;
 
+float vision_div_const;
+float div_err;
+
 // Called once on paparazzi autopilot start
 void init_land_guidance()
 {
@@ -82,11 +85,14 @@ void init_land_guidance()
   OF_dx = 0;
   OF_dy = 0;
 
+  div_err = 0.0;
+
   land_guidance_data.mode = 0;
   vision_pgain = VISION_PGAIN;
   vision_dgain = VISION_DGAIN;
   vision_land_pgain = VISION_LAND_PGAIN;
   vision_land_dgain = VISION_LAND_DGAIN;
+  vision_div_const = VISION_DIV_CONST;
   USE_TRANSLATIONAL = 0;
 }
 
@@ -96,9 +102,12 @@ void run_opticflow_land(void);
 // Called on each vision analysis result after receiving the struct
 void run_land_guidance_onvision(void)
 {
-  // Send ALL vision data to the ground
-  // TODO: optic flow telemetry
-//  DOWNLINK_SEND_PAYLOAD(DefaultChannel, DefaultDevice, N_BINS, gst2ppz.obstacle_bins);
+  if(autopilot_mode == AP_MODE_HOVER_CLIMB)
+  {
+	  run_opticflow_land();
+  }
+
+	/*
   if(autopilot_mode == AP_MODE_ATTITUDE_Z_HOLD)
   {
 	  land_guidance_data.mode = 1;
@@ -124,7 +133,7 @@ void run_land_guidance_onvision(void)
   default:    // do nothing
     break;
   }
-
+*/
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -167,7 +176,25 @@ void run_opticflow_land(void)
   // TODO: Using divergence flow for landing
   // Land if the drone is close to ground
 //	if (ppz2gst.alt == 0) NavKillThrottle();
-	if(divergence > 0.0f) guidance_v_zd_sp = (int)(vision_land_pgain*divergence*10000);
+
+	div_err = vision_div_const-divergence;
+
+//	if(divergence > 0.0f)
+//	{
+		//guidance_v_zd_sp = (vision_land_pgain*abs((int)((div_rate_const-divergence)/0.0000019)));
+//	div_err = div_rate_const-divergence;
+
+	guidance_v_zd_sp = guidance_v_zd_sp + ((int)(vision_land_pgain*div_err/0.0000019));
+
+	if(guidance_v_zd_sp > (int)(1.0/0.0000019)) guidance_v_zd_sp = (int)(1.0/0.0000019);
+	if(guidance_v_zd_sp < -(int)(1.0/0.0000019)) guidance_v_zd_sp = -(int)(1.0/0.0000019);
+//	}
+//	else
+//	{
+		//guidance_v_zd_sp = 0; //keep the same as previous control input
+//	}
+
+	DOWNLINK_SEND_VISION_CONTROL(DefaultChannel, DefaultDevice, &guidance_v_zd_sp, &vision_div_const, &div_err, &vision_land_pgain);
 }
 
 
