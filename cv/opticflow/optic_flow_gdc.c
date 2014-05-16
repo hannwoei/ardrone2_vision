@@ -2261,8 +2261,8 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 
 		//apply a moving average
 		int medianfilter = 0;
-		int averagefilter = 1;
-		int butterworthfilter = 0;
+		int averagefilter = 0;
+		int butterworthfilter = 1;
 		float div_avg = 0.0f;
 
 		if(averagefilter == 1)
