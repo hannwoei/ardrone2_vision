@@ -2229,7 +2229,7 @@ float ofs_filter_val_dx_prev = 0.0;
 float ofs_filter_val_dx_prev_prev = 0.0;
 float temp_divergence = 0.0;
 
-void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS)
+void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS, int *DIV_FILTER)
 {
 		// divergence:
 
@@ -2240,13 +2240,16 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		if(abs(*divergence) > minimal_divergence)
 		{
 			*mean_tti = 2.0f / *divergence;
-			if(FPS > 1E-3) *mean_tti /= FPS;
-			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
+//			if(FPS > 1E-3) *mean_tti /= FPS;
+//			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
+			if(FPS > 1E-3) *mean_tti /= 60;
+			else *mean_tti = ((2.0f / minimal_divergence) / 60);
 			*median_tti = *mean_tti;
 		}
 		else
 		{
-			*mean_tti = ((2.0f / minimal_divergence) / FPS);
+//			*mean_tti = ((2.0f / minimal_divergence) / FPS);
+			*mean_tti = ((2.0f / minimal_divergence) / 60);
 			*median_tti = *mean_tti;
 		}
 
@@ -2261,12 +2264,14 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 
 		//apply a moving average
 		int medianfilter = 0;
-		int averagefilter = 0;
-		int butterworthfilter = 1;
+		int averagefilter = 1;
+		int butterworthfilter = 0;
+		int kalmanfilter = 0;
 		float div_avg = 0.0f;
 
 		if(averagefilter == 1)
 		{
+			*DIV_FILTER = 1;
 			if (*divergence < 3.0 && *divergence > -3.0) {
 				div_buf[div_point] = *divergence;
 				div_point = (div_point+1) %mov_block; // index starts from 0 to mov_block
@@ -2281,6 +2286,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		}
 		else if(medianfilter == 1)
 		{
+			*DIV_FILTER = 2;
 			//apply a median filter
 			if (*divergence < 3.0 && *divergence > -3.0) {
 				div_buf[div_point] = *divergence;
@@ -2291,12 +2297,18 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		}
 		else if(butterworthfilter == 1)
 		{
+			*DIV_FILTER = 3;
 			temp_divergence = *divergence;
 			*divergence = OFS_BUTTER_NUM_1* (*divergence) + OFS_BUTTER_NUM_2*ofs_meas_dx_prev+ OFS_BUTTER_NUM_3*ofs_meas_dx_prev_prev- OFS_BUTTER_DEN_2*ofs_filter_val_dx_prev- OFS_BUTTER_DEN_3*ofs_filter_val_dx_prev_prev;
 		    ofs_meas_dx_prev_prev = ofs_meas_dx_prev;
 		    ofs_meas_dx_prev = temp_divergence;
 		    ofs_filter_val_dx_prev_prev = ofs_filter_val_dx_prev;
 		    ofs_filter_val_dx_prev = *divergence;
+		}
+		else if(kalmanfilter == 1)
+		{
+			*DIV_FILTER = 4;
+
 		}
 
 /*
@@ -2767,7 +2779,7 @@ void trackPointsCV(unsigned char *frame, unsigned char *prev_frame, int imW, int
 	return;
 }
 
-void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH)
+void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int *DIV_FILTER)
 {
 		// linear fit of the optic flow field
 		float error_threshold = 10; // 10
@@ -2791,12 +2803,12 @@ void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_
 		float min_error_u, min_error_v;
 		fitLinearFlowField(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
-		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, FPS);
+		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, FPS, DIV_FILTER);
 
 //		printf("0:%d\n1:%f\n",count,divergence[0]);
 }
 
-void analyseTTICV(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size)
+void analyseTTICV(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size, int* DIV_FILTER)
 {
 		// linear fit of the optic flow field
 		float error_threshold = 10; // 10
@@ -2821,7 +2833,51 @@ void analyseTTICV(float *divergence, float *mean_tti, float *median_tti, float *
 		float min_error_u, min_error_v;
 		fitLinearFlowFieldCV(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
-		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, FPS);
+		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, FPS, DIV_FILTER);
 
 //		printf("0:%d\n1:%f\n",count,divergence[0]);
+}
+
+unsigned int line_mov_block = 6; //default: 30
+float line_div_buf[6];
+unsigned int line_div_point = 0;
+
+void lineDivergence(float *divergence, int *x, int *y, int *new_x, int *new_y, int count)
+{
+	float inner = 0;
+	float outer = 0;
+
+	for(int i=0; i<(count-1); i++)
+	{
+		inner = inner + sqrt((float)((x[i+1]-x[i])*(x[i+1]-x[i])+(y[i+1]-y[i])*(y[i+1]-y[i])));
+		outer = outer + sqrt((float)((new_x[i+1]-new_x[i])*(new_x[i+1]-new_x[i])+(new_y[i+1]-new_y[i])*(new_y[i+1]-new_y[i])));
+	}
+
+	if (inner == outer)
+	{
+		*divergence = 0;
+	}
+	else
+	{
+		*divergence = inner/(outer-inner);
+	}
+
+	float div_avg = 0.0f;
+	int averagefilter = 0;
+
+	if(averagefilter == 1)
+	{
+		//*DIV_FILTER = 1;
+		if (*divergence < 100.0 && *divergence > -100.0) {
+			line_div_buf[line_div_point] = *divergence;
+			line_div_point = (line_div_point+1) %line_mov_block; // index starts from 0 to line_mov_block
+		}
+
+		int im;
+		for (im=0;im<line_mov_block;im++) {
+			div_avg+=line_div_buf[im];
+		}
+		*divergence = div_avg/ line_mov_block;
+	}
+
 }
