@@ -24,6 +24,7 @@
 
 // Paparazzi Data
 #include "state.h"
+#include "subsystems/ins/ins_int.h"
 
 // Vision Data
 #include "video_message_structs.h"
@@ -53,9 +54,9 @@ struct LandGuidanceStruct land_guidance_data;
 
 /* error if some gains are negative */
 #if (VISION_PGAIN < 0)      ||                   \
-  (VISION_DGAIN < 0)        ||                   \
+  (VISION_DGAIN < 0)/*        ||                   \
   (VISION_LAND_PGAIN < 0)   ||                   \
-  (VISION_LAND_DGAIN < 0)
+  (VISION_LAND_DGAIN < 0)*/
 #error "ALL control gains have to be positive!!!"
 #endif
 
@@ -63,29 +64,37 @@ int32_t vision_pgain;
 int32_t vision_dgain;
 float vision_land_pgain;
 float vision_land_dgain;
-int OF_x;
-int OF_y;
-int OF_dx;
-int OF_dy;
-int OF_x_prev;
-int OF_y_prev;
+float OF_dx;
+float OF_dy;
+float OF_ddx;
+float OF_ddy;
+float OF_dx_prev;
+float OF_dy_prev;
+
+volatile struct Int32Eulers cmd_euler;
 
 int USE_TRANSLATIONAL;
 
 float vision_div_const;
 float div_err;
+float div_err_prev;
+int off_count;
 
 // Called once on paparazzi autopilot start
 void init_land_guidance()
 {
-  OF_x = 0;
-  OF_y = 0;
-  OF_x_prev = 0;
-  OF_y_prev = 0;
-  OF_dx = 0;
-  OF_dy = 0;
+  OF_dx = 0.0;
+  OF_dy = 0.0;
+  OF_dx_prev = 0.0;
+  OF_dy_prev = 0.0;
+  OF_ddx = 0.0;
+  OF_ddy = 0.0;
+
+  INT_EULERS_ZERO(cmd_euler);
 
   div_err = 0.0;
+  div_err_prev = 0.0;
+  off_count = 0;
 
   land_guidance_data.mode = 0;
   vision_pgain = VISION_PGAIN;
@@ -105,6 +114,10 @@ void run_land_guidance_onvision(void)
   if(autopilot_mode == AP_MODE_HOVER_CLIMB)
   {
 	  run_opticflow_land();
+  }
+  else if(autopilot_mode == AP_MODE_ATTITUDE_Z_HOLD)
+  {
+	  run_opticflow_hover();
   }
 
 	/*
@@ -152,23 +165,31 @@ void run_opticflow_hover(void)
 //	autopilot_mode = AP_MODE_ATTITUDE_Z_HOLD;
 //	autopilot_mode_auto2 = AP_MODE_ATTITUDE_Z_HOLD;
 	// augment controller parameters
-	USE_TRANSLATIONAL = 0;
+	USE_TRANSLATIONAL = 1;
 	if (USE_TRANSLATIONAL == 0)
 	{
-		  OF_x = opt_angle_x_raw;
-		  OF_y = opt_angle_y_raw;
+		  OF_dx = (float)opt_angle_x_raw;
+		  OF_dy = (float)opt_angle_y_raw;
 	}
 	else
 	{
-		  OF_x = opt_trans_x;
-		  OF_y = opt_trans_y;
+		  OF_dx = opt_trans_x;
+		  OF_dy = opt_trans_y;
 	}
-	  OF_dx = OF_x - OF_x_prev;
-	  OF_dy = OF_y - OF_y_prev;
-	  stab_att_sp_euler.phi = vision_dgain*OF_dx/100 + vision_pgain*OF_x/100;
-	  stab_att_sp_euler.theta = vision_dgain*OF_dy/100 + vision_pgain*OF_y/100;
-	  OF_x_prev = OF_x;
-	  OF_y_prev = OF_y;
+	  OF_ddx = OF_dx - OF_dx_prev;
+	  OF_ddy = OF_dy - OF_dy_prev;
+//	  stab_att_sp_euler.phi = vision_dgain*OF_ddx/100 + vision_pgain*OF_dx/100;
+//	  stab_att_sp_euler.theta = vision_dgain*OF_ddy/100 + vision_pgain*OF_dy/100;
+
+	  cmd_euler.phi = vision_pgain*OF_dx/100;
+	  cmd_euler.theta = vision_pgain*OF_dy/100;
+
+	  OF_dx_prev = OF_dx;
+	  OF_dy_prev = OF_dy;
+
+	  stabilization_attitude_set_rpy_setpoint_i(&cmd_euler);
+
+	 DOWNLINK_SEND_VISION_STABILIZATION(DefaultChannel, DefaultDevice, &stateGetPositionEnu_i()->z, &ins_impl.baro_z, &ins_impl.sonar_z, &stateGetNedToBodyEulers_i()->phi, &stateGetNedToBodyEulers_i()->theta, &stateGetNedToBodyEulers_i()->psi, &cmd_euler.phi, &cmd_euler.theta);
 }
 
 void run_opticflow_land(void)
@@ -194,7 +215,18 @@ void run_opticflow_land(void)
 		//guidance_v_zd_sp = 0; //keep the same as previous control input
 //	}
 
-	DOWNLINK_SEND_VISION_CONTROL(DefaultChannel, DefaultDevice, &guidance_v_zd_sp, &vision_div_const, &div_err, &vision_land_pgain);
+	if(div_err == div_err_prev)
+	{
+		off_count++;
+	}
+	else
+	{
+		off_count = 0;
+	}
+	// Land if the drone is close to ground after 3 seconds touchdown assuming 60fps
+	if(off_count > 180) NavKillThrottle();
+	div_err_prev = div_err;
+	DOWNLINK_SEND_VISION_LAND(DefaultChannel, DefaultDevice, &guidance_v_zd_sp, &vision_div_const, &div_err, &vision_land_pgain, &off_count);
 }
 
 
