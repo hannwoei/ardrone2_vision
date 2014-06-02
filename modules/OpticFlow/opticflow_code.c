@@ -253,11 +253,9 @@ void my_plugin_run(unsigned char *frame)
 
 		// Velocity Computation
 		cam_h = ins_impl.sonar_z;
-		if(cam_h > 0.01)
-		{
-			Velx = opt_trans_x/cam_h*Fx_ARdrone;
-			Vely = opt_trans_y/cam_h*Fy_ARdrone;
-		}
+
+		Velx = opt_trans_x*cam_h/Fx_ARdrone;
+		Vely = opt_trans_y*cam_h/Fy_ARdrone;
 
 		//tele purpose
 

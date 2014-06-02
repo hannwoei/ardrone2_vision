@@ -9,6 +9,7 @@ extern unsigned int adjust_factor;
 extern unsigned int verbose;
 extern float opt_trans_x;
 extern float opt_trans_y;
+extern float Velx, Vely;
 extern int opt_angle_x_raw;
 extern int opt_angle_y_raw;
 

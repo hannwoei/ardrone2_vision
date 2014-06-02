@@ -173,16 +173,16 @@ void run_opticflow_hover(void)
 	}
 	else
 	{
-		  OF_dx = opt_trans_x;
-		  OF_dy = opt_trans_y;
+		  OF_dx = Velx;
+		  OF_dy = Vely;
 	}
 	  OF_ddx = OF_dx - OF_dx_prev;
 	  OF_ddy = OF_dy - OF_dy_prev;
 //	  stab_att_sp_euler.phi = vision_dgain*OF_ddx/100 + vision_pgain*OF_dx/100;
 //	  stab_att_sp_euler.theta = vision_dgain*OF_ddy/100 + vision_pgain*OF_dy/100;
 
-	  cmd_euler.phi = vision_pgain*OF_dx/100;
-	  cmd_euler.theta = vision_pgain*OF_dy/100;
+	  cmd_euler.phi = vision_pgain*OF_dx;
+	  cmd_euler.theta = vision_pgain*OF_dy;
 
 	  OF_dx_prev = OF_dx;
 	  OF_dy_prev = OF_dy;
