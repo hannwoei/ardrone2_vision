@@ -165,15 +165,8 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
     if(count)
     {
-    	unsigned int USE_OPENCV = 0;
-    	if(USE_OPENCV)
-    	{
-    		trackPointsCV(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points,&flow_point_size, detected_points0, detected_points1, x, y, new_x, new_y, dx, dy, status);
-    	}
-    	else
-    	{
-    		trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, x, y, new_x, new_y, dx, dy, status);
-    	}
+    	trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, x, y, new_x, new_y, dx, dy, status);
+
 //		showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
 
 		int tot_x=0;
@@ -265,14 +258,7 @@ void my_plugin_run(unsigned char *frame)
 
 		if(USE_FITTING == 1)
 		{
-			if(USE_OPENCV)
-			{
-				analyseTTICV(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, flow_point_size, &DIV_FILTER);
-			}
-			else
-			{
-				analyseTTI(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
-			}
+			analyseTTI(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
 		}
 
 		// new method for computing divergence

@@ -8,11 +8,6 @@
 #include "opticflow/fastRosten.h"
 #include "../../modules/OpticFlow/opticflow_module.h"
 
-//OpenCV
-#include <opencv2/core/core_c.h>
-#include <opencv2/highgui/highgui_c.h>
-#include <opencv2/imgproc/imgproc_c.h>
-
 #define int_index(x,y) (y * IMG_WIDTH + x)
 #define uint_index(xx, yy) (((yy * IMG_WIDTH + xx) * 2) & 0xFFFFFFFC)
 #define NO_MEMORY -1
@@ -2003,218 +1998,6 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 //printf("stop8\n");
 }
 
-void fitLinearFlowFieldCV(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold, int *n_inlier_minu, int *n_inlier_minv)
-{
-		CvMat Maa, Mbu_all, Mbv_all, Ma, Mbu, Mbv, Mpu, Mpv;
-		int *sample_indices;
-		sample_indices =(int *) calloc(n_samples,sizeof(int));
-		float *A, *bu, *bv, *AA, *bu_all, *bv_all;
-		A = (float *) calloc(n_samples*3,sizeof(float));// A1 is a N x 3 matrix with rows [x, y, 1]
-		bu = (float *) calloc(n_samples,sizeof(float)); // bu is a N x 1 vector with elements dx (or dy)
-		bv = (float *) calloc(n_samples,sizeof(float)); // bv is a N x 1 vector with elements dx (or dy)
-		AA = (float *) calloc(count*3,sizeof(float));   // AA contains all points with rows [x, y, 1]
-		bu_all = (float *) calloc(count,sizeof(float)); // bu is a N x 1 vector with elements dx (or dy)
-		bv_all = (float *) calloc(count,sizeof(float)); // bv is a N x 1 vector with elements dx (or dy)
-		int si, add_si, p, i_rand, sam;
-		pu[0] = 0.0f; pu[1] = 0.0f; pu[2] = 0.0f;
-		pv[0] = 0.0f; pv[1] = 0.0f; pv[2] = 0.0f;
-		//		int n_inliers;
-		float * PU, * errors_pu, * PV, * errors_pv;
-		int * n_inliers_pu, * n_inliers_pv;
-		PU = (float *) calloc(n_iterations*3,sizeof(float));
-		PV = (float *) calloc(n_iterations*3,sizeof(float));
-		errors_pu = (float *) calloc(n_iterations,sizeof(float));
-		errors_pv = (float *) calloc(n_iterations,sizeof(float));
-		n_inliers_pu = (int *) calloc(n_iterations,sizeof(int));
-		n_inliers_pv = (int *) calloc(n_iterations,sizeof(int));
-
-		// initialize matrices and vectors for the full point set problem:
-		// this is used for determining inliers
-		for(sam = 0; sam < count; sam++)
-		{
-			AA[sam*3] = (float) x[sam];
-			AA[sam*3+1] = (float) y[sam];
-			AA[sam*3+2] = 1.0;
-			bu_all[sam] = (float) dx[sam];
-			bv_all[sam] = (float) dy[sam];
-		}
-		cvInitMatHeader(&Maa, count, 3, CV_32FC1, AA, CV_AUTOSTEP);
-		cvInitMatHeader(&Mbu_all, count, 1, CV_32FC1, bu_all, CV_AUTOSTEP);
-		cvInitMatHeader(&Mbv_all, count, 1, CV_32FC1, bv_all, CV_AUTOSTEP);
-
-		// perform RANSAC:
-		int it, ii;
-		for(it = 0; it < n_iterations; it++)
-		{
-			// select a random sample of n_sample points:
-			memset(sample_indices, 0, n_samples*sizeof(int));
-			i_rand = 0;
-//printf("stop1\n");
-			while(i_rand < n_samples)
-			{
-				si = rand() % count;
-				add_si = 1;
-				for(ii = 0; ii < i_rand; ii++)
-				{
-					if(sample_indices[ii] == si) add_si = 0;
-				}
-				if(add_si)
-				{
-					sample_indices[i_rand] = si;
-					i_rand ++;
-				}
-			}
-//printf("stop2\n");
-			// Setup the system:
-			for(sam = 0; sam < n_samples; sam++)
-			{
-				A[sam*3] = (float) x[sample_indices[sam]];
-				A[sam*3+1] = (float) y[sample_indices[sam]];
-				A[sam*3+2] = 1.0;
-				bu[sam] = (float) dx[sample_indices[sam]];
-				bv[sam] = (float) dy[sample_indices[sam]];
-				//printf("%d,%d,%d,%d,%d\n",A[sam][0],A[sam][1],A[sam][2],bu[sam],bv[sam]);
-			}
-//printf("stop3\n");
-			// Solve the small system:
-			cvInitMatHeader(&Ma, n_samples, 3, CV_32FC1, A, CV_AUTOSTEP);
-
-			// for horizontal flow:
-			cvInitMatHeader(&Mbu, n_samples, 1, CV_32FC1, bu, CV_AUTOSTEP);
-			cvInitMatHeader(&Mpu, 3, 1, CV_32FC1, pu, CV_AUTOSTEP );
-			cvSolve(&Ma, &Mbu, &Mpu,  CV_SVD);
-
-			// for vertical flow:
-			cvInitMatHeader(&Mbv, n_samples, 1, CV_32FC1, bv, CV_AUTOSTEP);
-			cvInitMatHeader(&Mpv, 3, 1, CV_32FC1, pv, CV_AUTOSTEP );
-			cvSolve(&Ma, &Mbv, &Mpv,  CV_SVD);
-
-			// for horizontal flow:
-			PU[it*3] = pu[0];
-			PU[it*3+1] = pu[1];
-			PU[it*3+2] = pu[2];
-
-			// for vertical flow:
-			PV[it*3] = pv[0];
-			PV[it*3+1] = pv[1];
-			PV[it*3+2] = pv[2];
-
-//printf("stop4\n");
-			// count inliers and determine their error:
-			errors_pu[it] = 0;
-			errors_pv[it] = 0;
-			n_inliers_pu[it] = 0;
-			n_inliers_pv[it] = 0;
-
-//			// for horizontal flow:
-			CvMat *bb = cvCreateMat(count, 1, CV_32FC1);
-			cvMatMul(&Maa, &Mpu, bb);
-			CvMat *C = cvCreateMat(count, 1, CV_32FC1);
-			cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbu_all,  C);
-
-			for(p = 0; p < count; p++)
-			{
-
-				if(C->data.db[p] < error_threshold)
-				{
-					printf("pu_c = %f, ", C->data.db[p]);
-					errors_pu[it] += abs(C->data.db[p]);
-					n_inliers_pu[it]++;
-				}
-			}
-			printf("\n");
-			// for vertical flow:
-			cvMatMul(&Maa, &Mpv, bb);
-			cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbv_all,  C);
-			for(p = 0; p < count; p++)
-			{
-
-				if(C->data.db[p] < error_threshold)
-				{
-					printf("pv_c = %f, ", C->data.db[p]);
-					errors_pv[it] += abs(C->data.db[p]);
-					n_inliers_pv[it]++;
-				}
-			}
-			printf("\n");
-		}
-//printf("stop5\n");
-
-		// select the parameters with lowest error:
-		// for horizontal flow:
-		int param;
-		int min_ind = 0;
-		*min_error_u = (float)errors_pu[0];
-		for(it = 1; it < n_iterations; it++)
-		{
-			if(errors_pu[it] < *min_error_u)
-			{
-				*min_error_u = (float)errors_pu[it];
-				min_ind = it;
-			}
-		}
-		for(param = 0; param < 3; param++)
-		{
-			pu[param] = PU[min_ind*3+param];
-		}
-		//printf("pu_sel=%f,%f,%f\n",pu[0],pu[1],pu[2]);
-		// for vertical flow:
-		min_ind = 0;
-		*min_error_v = (float)errors_pv[0];
-
-		for(it = 0; it < n_iterations; it++)
-		{
-			if(errors_pv[it] < *min_error_v)
-			{
-				*min_error_v = (float)errors_pv[it];
-				min_ind = it;
-			}
-		}
-		for(param = 0; param < 3; param++)
-		{
-			pv[param] = PV[min_ind*3+param];
-		}
-		*n_inlier_minu = n_inliers_pu[min_ind];
-		*n_inlier_minv = n_inliers_pv[min_ind];
-//printf("stop6\n");
-		// error has to be determined on the entire set:
-		CvMat *bb = cvCreateMat(count, 1, CV_32FC1);
-		cvMatMul(&Maa, &Mpu, bb);
-		CvMat *C = cvCreateMat(count, 1, CV_32FC1);
-		cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbu_all,  C);
-		*min_error_u = 0;
-		for(p = 0; p < count; p++)
-		{
-			*min_error_u += abs(C->data.db[p]);
-		}
-		cvMatMul(&Maa, &Mpv, bb);
-		cvScaleAdd( bb, cvScalar(-1,0,0,0), &Mbv_all,  C);
-		*min_error_v = 0;
-		for(p = 0; p < count; p++)
-		{
-			*min_error_v += abs(C->data.db[p]);
-		}
-		*divergence_error = (*min_error_u + *min_error_v) / (2 * count);
-
-		// delete allocated dynamic arrays
-//printf("stop7\n");
-		free(A);
-		free(AA);
-		free(PU);
-		free(PV);
-		free(n_inliers_pu);
-		free(n_inliers_pv);
-		free(errors_pu);
-		free(errors_pv);
-		free(bu);
-		free(bv);
-		free(bu_all);
-		free(bv_all);
-		free(sample_indices);
-//printf("stop8\n");
-}
-
-
 unsigned int mov_block = 30; //default: 30
 float div_buf[30];
 unsigned int div_point = 0;
@@ -2229,7 +2012,7 @@ float ofs_filter_val_dx_prev = 0.0;
 float ofs_filter_val_dx_prev_prev = 0.0;
 float temp_divergence = 0.0;
 
-void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, float FPS, int *DIV_FILTER)
+void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, int *DIV_FILTER)
 {
 		// divergence:
 
@@ -2420,22 +2203,22 @@ void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int i
 void yuyv_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst)
 {
    int l, c;
-   int r, g, b, cr, cg, cb, y1, y2;
+   int r, g, b, cr, cg, cb, kl1, kl2;
 
    l = height;
    while (l--) {
       c = width >> 1;
       while (c--) {
-         y1 = *src++;
+         kl1 = *src++;
          cb = ((*src - 128) * 454) >> 8;
          cg = (*src++ - 128) * 88;
-         y2 = *src++;
+         kl2 = *src++;
          cr = ((*src - 128) * 359) >> 8;
          cg = (cg + (*src++ - 128) * 183) >> 8;
 
-         r = y1 + cr;
-         b = y1 + cb;
-         g = y1 - cg;
+         r = kl1 + cr;
+         b = kl1 + cb;
+         g = kl1 - cg;
          SAT(r);
          SAT(g);
          SAT(b);
@@ -2444,9 +2227,9 @@ void yuyv_to_rgb24 (int width, int height, unsigned char *src, unsigned char *ds
      *dst++ = g;
      *dst++ = r;
 
-         r = y2 + cr;
-         b = y2 + cb;
-         g = y2 - cg;
+         r = kl2 + cr;
+         b = kl2 + cb;
+         g = kl2 - cg;
          SAT(r);
          SAT(g);
          SAT(b);
@@ -2631,154 +2414,6 @@ void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int i
 	return;
 }
 
-IplImage *cvGrayImg = 0;
-IplImage *cvPrevGrayImg = 0;
-IplImage *cvImg = 0;
-IplImage *cvPrevImg = 0;
-IplImage *pyramid = 0;
-IplImage *prev_pyramid = 0;
-CvPoint2D32f* points[3];
-int flags = 0;
-char* cv_status = 0;
-int error_opticflow = 1;
-unsigned char *prev_gray_frame = 0;
-unsigned char *gray_frame = 0;
-
-IplImage *swap_temp = 0;
-CvPoint2D32f* swap_points;
-//int saveimg = 1;
-
-void trackPointsCV(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points0[], struct detectedPoint detected_points1[],  int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status)
-{
-
-	// a) track the points to the new image
-	// b) quality checking  for eliminating points (status / match error / tracking the features back and comparing / etc.)
-	// c) update the points (immediate update / Kalman update)
-
-	int i;
-
-	CvMat cv = cvMat(imH, imW, CV_16UC(1), frame);
-	CvMat cvPrev = cvMat(imH, imW, CV_16UC(1), prev_frame);
-	cvImg =  (IplImage*)&cv;
-	cvPrevImg =  (IplImage*)&cvPrev;
-
-	// Convert to gray image
-    if(!cvGrayImg) cvGrayImg = cvCreateImage(cvSize(imW,imH),IPL_DEPTH_8U,1);
-    if(!cvPrevGrayImg) cvPrevGrayImg = cvCreateImage(cvSize(imW,imH),IPL_DEPTH_8U,1);
-    cvConvertScale( cvImg, cvGrayImg, 1.0f/256.0f, 0);
-    cvConvertScale( cvPrevImg, cvPrevGrayImg, 1.0f/256.0f, 0);
-
-//    if(saveimg == 1)
-//    {
-//    	cvSaveImage("/data/video/gray_yuv.jpg",cvGrayImg, 0);
-//    	cvSaveImage("/data/video/yuv.jpg",cvImg, 0);
-//    	saveimg = 0;
-//    }
-
-
-    if(!pyramid)
-    {
-//    	CvSize pyr_sz = cvSize( cvGrayImg->width, cvGrayImg->height );
-    	pyramid = cvCreateImage( cvGetSize(cvGrayImg), IPL_DEPTH_32F, 1 );
-    	prev_pyramid = cvCreateImage( cvGetSize(cvGrayImg), IPL_DEPTH_32F, 1 );
-    	cv_status = (char*) malloc(MAX_COUNT*sizeof(char));
-    	// Allocate feature point buffer (once)
-		points[0]		= (CvPoint2D32f*)cvAlloc(MAX_COUNT*sizeof(points[0][0]));
-		points[1]		= (CvPoint2D32f*)cvAlloc(MAX_COUNT*sizeof(points[0][0]));
-		points[2]		= (CvPoint2D32f*)cvAlloc(MAX_COUNT*sizeof(points[0][0]));
-    }
-
-    for(i = 0; i<*count; i++)
-    {
-    	points[0][i].x = (float)detected_points0[i].x;
-    	points[0][i].y = (float)detected_points0[i].y;
-    	points[1][i].x = (float)detected_points1[i].x;
-    	points[1][i].y = (float)detected_points1[i].y;
-    }
-
-	// a) track the points to the new image
-	if( *count > 0)
-    {
-		cvCalcOpticalFlowPyrLK( cvPrevGrayImg, cvGrayImg, prev_pyramid, pyramid,
-			points[0], points[1], *count, cvSize(5,5), 3, cv_status, 0,					// points[0]: prev_features
-			cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10, 0.03), flags );	// points[1]: curr_features
-		flags |= 1;
-		error_opticflow = 0;
-    }
-
-	if(error_opticflow == 0)
-	{
-		// b) quality checking  for eliminating points (status / match error / tracking the features back and comparing / etc.)
-		int remove_point = 0;
-		int c;
-		for(i = *flow_point_size-1; i >= 0; i-- )
-	    {
-	        if(!cv_status[i])
-			{
-				remove_point = 1;
-			}
-
-			// error[i] can also be used, etc.
-
-			if(remove_point)
-			{
-				// we now erase the point if it is not observed in the new image
-				// later we may count it as a single miss, allowing for a few misses
-				for(c = i; c < *flow_point_size-1; c++)
-				{
-					flow_points[c].x = flow_points[c+1].x;
-					flow_points[c].y = flow_points[c+1].y;
-					flow_points[c].prev_x= flow_points[c+1].prev_x;
-					flow_points[c].prev_y = flow_points[c+1].prev_y;
-					flow_points[c].dx = flow_points[c+1].dx;
-					flow_points[c].dy = flow_points[c+1].dy;
-					flow_points[c].new_dx = flow_points[c+1].new_dx;
-					flow_points[c].new_dy = flow_points[c+1].new_dy;
-				}
-				(*flow_point_size)--;
-			}
-			else
-			{
-				flow_points[i].new_dx = points[1][i].x - points[0][i].x;
-				flow_points[i].new_dy = points[1][i].y - points[0][i].y;
-			}
-		}
-
-		// c) update the points (immediate update / Kalman update)
-		*count = *flow_point_size;
-
-		for(i = 0; i < *count; i++)
-		{
-			// immediate update:
-			flow_points[i].dx = flow_points[i].new_dx;
-			flow_points[i].dy = flow_points[i].new_dy;
-			flow_points[i].prev_x = flow_points[i].x;
-			flow_points[i].prev_y = flow_points[i].y;
-			flow_points[i].x = flow_points[i].x + flow_points[i].dx;
-			flow_points[i].y = flow_points[i].y + flow_points[i].dy;
-			x[i] = flow_points[i].prev_x;
-			y[i] = flow_points[i].prev_y;
-			new_x[i] = flow_points[i].x;
-			new_y[i] = flow_points[i].y;
-			dx[i] = flow_points[i].dx;
-			dy[i] = flow_points[i].dy;
-		}
-	}
-
-    for(i = 0; i<*count; i++)
-    {
-    	detected_points1[i].x = points[1][i].x;
-    	detected_points1[i].y = points[1][i].y;
-    }
-
-	// *********************************************
-	// (5) housekeeping to prepare for the next call
-	// *********************************************
-    CV_SWAP(prev_pyramid, pyramid, swap_temp);
-
-	return;
-}
-
 void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int *DIV_FILTER)
 {
 		// linear fit of the optic flow field
@@ -2803,37 +2438,7 @@ void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_
 		float min_error_u, min_error_v;
 		fitLinearFlowField(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
-		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, FPS, DIV_FILTER);
-
-//		printf("0:%d\n1:%f\n",count,divergence[0]);
-}
-
-void analyseTTICV(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int flow_point_size, int* DIV_FILTER)
-{
-		// linear fit of the optic flow field
-		float error_threshold = 10; // 10
-		int n_iterations = 20; // 40
-
-		int n_samples = (count < 5) ? count : 5;
-		count = flow_point_size;
-
-		// minimum = 3
-		if(n_samples < 3)
-		{
-			// set dummy values for tti, etc.
-			*mean_tti = 1000.0f / 60;
-			*median_tti = *mean_tti;
-			*d_heading = 0;
-			*d_pitch = 0;
-			return;
-		}
-		float pu[3], pv[3];
-
-		//float divergence_error;
-		float min_error_u, min_error_v;
-		fitLinearFlowFieldCV(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
-
-		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, FPS, DIV_FILTER);
+		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, DIV_FILTER);
 
 //		printf("0:%d\n1:%f\n",count,divergence[0]);
 }

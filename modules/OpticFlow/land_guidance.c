@@ -71,7 +71,7 @@ float OF_ddy;
 float OF_dx_prev;
 float OF_dy_prev;
 
-volatile struct Int32Eulers cmd_euler;
+struct Int32Eulers cmd_euler;
 
 int USE_TRANSLATIONAL;
 

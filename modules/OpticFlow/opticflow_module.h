@@ -40,6 +40,11 @@ extern void opticflow_module_init(void);
 extern void opticflow_module_run(void);
 extern void opticflow_module_start(void);
 extern void opticflow_module_stop(void);
-extern volatile float FPS;
+extern float FPS;
+
+struct timeval;
+long time_elapsed (struct timeval *t1, struct timeval *t2) ;
+void start_timer(void);
+long end_timer(void);
 
 #endif /* OPTICFLOW_LAND_H */
