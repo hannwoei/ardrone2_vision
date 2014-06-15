@@ -245,10 +245,22 @@ void my_plugin_run(unsigned char *frame)
 		}
 
 		// Velocity Computation
+#if USE_SONAR
 		cam_h = ins_impl.sonar_z;
+#else
+		cam_h = 1;
+#endif
+		if(count)
+		{
+			Velx = opt_trans_x*cam_h/Fx_ARdrone;
+			Vely = opt_trans_y*cam_h/Fy_ARdrone;
+		}
+		else
+		{
+			Velx = 0.0;
+			Vely = 0.0;
+		}
 
-		Velx = opt_trans_x*cam_h/Fx_ARdrone;
-		Vely = opt_trans_y*cam_h/Fy_ARdrone;
 
 		//tele purpose
 
@@ -262,7 +274,7 @@ void my_plugin_run(unsigned char *frame)
 		}
 
 		// new method for computing divergence
-		lineDivergence(&new_divergence, x, y, new_x, new_y, count);
+		// lineDivergence(&new_divergence, x, y, new_x, new_y, count);
 
 
 		// *********************************************

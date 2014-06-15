@@ -36,8 +36,10 @@ extern struct LandGuidanceStruct land_guidance_data;
 void init_land_guidance(void);
 void run_land_guidance_onvision(void);
 
-extern int32_t vision_pgain;
-extern int32_t vision_dgain;
+extern int32_t vision_phi_pgain;
+extern int32_t vision_phi_dgain;
+extern int32_t vision_theta_pgain;
+extern int32_t vision_theta_dgain;
 
 extern float vision_land_pgain;
 extern float vision_land_dgain;
