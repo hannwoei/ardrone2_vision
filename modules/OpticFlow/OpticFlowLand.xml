@@ -22,18 +22,10 @@
 include $(PAPARAZZI_HOME)/sw/ext/ardrone2_vision/Makefile.paths
           
 VISION_MODULE_FOLDER = $(DIR_MODULES)/OpticFlow
-      	
-#OPENCV_INSTALL = /home/h2w/OMAP/thirdParty/opencv_install_ardrone/install/
-#OPENCV_SRC = /home/h2w/OMAP/thirdParty/opencv-2.4.7/
       	     	
 $(TARGET).CFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -D__USE_GNU 
 $(TARGET).CXXFLAGS += -I$(PAPARAZZI_HOME)/sw/include/ -I$(PAPARAZZI_SRC)/sw/airborne -I$(PAPARAZZI_SRC)/conf/autopilot -I$(PAPARAZZI_SRC)/sw/airborne/arch/$($(TARGET).ARCHDIR) -I$(VARINCLUDE) -I$(ACINCLUDE) -I$(PAPARAZZI_SRC)/sw/airborne/modules/
 $(TARGET).CXXFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -D__USE_GNU
-      	
-#$(TARGET).CFLAGS += -I$(OPENCV_SRC)/include/
-#$(TARGET).CFLAGS += -I$(OPENCV_SRC)/modules/highgui/include/
-#$(TARGET).CFLAGS += -I$(OPENCV_SRC)/modules/core/include/
-#$(TARGET).CFLAGS += -I$(OPENCV_SRC)/modules/imgproc/include/
 
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
@@ -48,13 +40,7 @@ $(TARGET).srcs += $(DIR_LIB)/udp/socket.c
 $(TARGET).srcs += $(DIR_LIB)/v4l/video.c
 $(TARGET).CFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread
 $(TARGET).LDFLAGS += -pthread -lrt -static
-      	
-#$(TARGET).cpp_srcs += $(VISION_MODULE_FOLDER)/dummy.c
 
-#LDFLAGS += -static -ldl -lm -lstdc++ -lrt -lpthread 
-#LDFLAGS += -L$(OPENCV_INSTALL)/lib/ -L$(OPENCV_INSTALL)/share/OpenCV/3rdparty/lib/
-#LDFLAGS += -lopencv_video -lopencv_highgui -lopencv_imgproc -lopencv_core -llibjasper -lIlmImf -lzlib -llibtiff -llibpng -llibjpeg -lrt
-#LDFLAGS += -lopencv_legacy -lopencv_objdetect -lopencv_calib3d -lopencv_features2d  
 all:
 	make -C $(VISION_MODULE_FOLDER)/visionresult/
 
