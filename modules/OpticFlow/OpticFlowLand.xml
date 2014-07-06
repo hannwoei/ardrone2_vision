@@ -16,6 +16,7 @@
     <define name="ARDRONE_VIDEO_PORT" value="2002" />
     <define name="USE_ARDRONE_VIDEO" />  
     <define name="USE_FMS" value="0"/>
+    <define name="USE_OPTICFLOW_HOVER" value="1"/>
 <!--    <file name="video.c"/>  -->
       <raw>
 
@@ -29,6 +30,7 @@ $(TARGET).CXXFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -D__USE
 
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
+#$(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code_new.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/land_guidance.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/optic_flow_gdc.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/fastRosten.c
