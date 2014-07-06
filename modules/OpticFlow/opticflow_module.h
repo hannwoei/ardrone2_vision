@@ -29,19 +29,14 @@
 #ifndef OPTICFLOW_LAND_H
 #define OPTICFLOW_LAND_H
 
-
-// Settings
-//extern int obstacle_avoid_adjust_factor;
-/*extern float FPS;
-extern int prev_time;*/
-
 // Module functions
 extern void opticflow_module_init(void);
 extern void opticflow_module_run(void);
 extern void opticflow_module_start(void);
 extern void opticflow_module_stop(void);
-extern float FPS;
 
+// Frame Rate
+extern float FPS;
 struct timeval;
 long time_elapsed (struct timeval *t1, struct timeval *t2) ;
 void start_timer(void);

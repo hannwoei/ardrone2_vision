@@ -42,8 +42,7 @@ struct gst2ppz_message_struct gst2ppz;
 struct ppz2gst_message_struct ppz2gst;
 
 
-//=== returns the number of usecs of (t2 - t1)
-// FPS
+// Frame Rate
 #include <sys/time.h>
 float FPS;
 volatile long timestamp;
@@ -161,7 +160,7 @@ void *computervision_thread_main(void* data)
   struct img_struct* img_new = video_create_image(&vid);
 
   // Video Resizing
-  #define DOWNSIZE_FACTOR   1
+  #define DOWNSIZE_FACTOR 1
   struct img_struct small;
   small.w = vid.w / DOWNSIZE_FACTOR;
   small.h = vid.h / DOWNSIZE_FACTOR;
@@ -181,17 +180,14 @@ void *computervision_thread_main(void* data)
 #endif
 
   // First Apply Settings before init
-  imgWidth = small.w;
-  imgHeight = small.h;
+  imgWidth = vid.w;
+  imgHeight = vid.h;
   verbose = 2;
   my_plugin_init();
 
   while (computer_vision_thread_command > 0)
   {
     video_grab_image(&vid, img_new);
-
-    // Resize: device by 4
-    resize_uyuv(img_new, &small, DOWNSIZE_FACTOR);
 
     // FPS
 	timestamp = end_timer();
@@ -200,11 +196,15 @@ void *computervision_thread_main(void* data)
 	start_timer();
 
     // Process
-    my_plugin_run(small.buf);
+    my_plugin_run(img_new->buf);
+
+    // Resize: device by 4
+    resize_uyuv(img_new, &small, DOWNSIZE_FACTOR);
+
 
 #ifdef DOWNLINK_VIDEO
     // JPEG encode the image:
-    uint32_t quality_factor = 60; // quality factor from 1 (high quality) to 8 (low quality)
+    uint32_t quality_factor = 10; //20 if no resize,
     uint8_t dri_header = 0;
     uint32_t image_format = FOUR_TWO_TWO;  // format (in jpeg.h)
     uint8_t* end = encode_image (small.buf, jpegbuf, quality_factor, image_format, small.w, small.h, dri_header);
