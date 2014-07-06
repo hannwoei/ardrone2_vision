@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <semaphore.h>
 
 // Computer Vision
 #include "opticflow/optic_flow_gdc.h"
@@ -15,6 +16,9 @@
 // Paparazzi Data
 #include "state.h"
 #include "subsystems/ins/ins_int.h"
+#include "math/pprz_algebra_int.h"
+#include "math/pprz_algebra_float.h"
+#include "subsystems/imu.h"
 
 // Communication
 #include "video_message_structs.h"
@@ -24,6 +28,9 @@ struct ppz2gst_message_struct ppz2gst;
 // Downlink
 #include "messages.h"
 #include "subsystems/datalink/downlink.h"
+
+// Timer
+#include <sys/time.h>
 
 //#include "paparazzi.h"
 
@@ -73,15 +80,22 @@ detectedPoint swap_points[MAX_COUNT];
 #define xDerotate 1.000000019
 #define yDerotate 1.000000014
 unsigned int att_buf_point = 0;
-int curr_pitch, curr_roll, prev_pitch, prev_roll;
-float cam_h, diff_roll, diff_pitch, diff_roll_buf[12], diff_pitch_buf[12], opt_trans_x, opt_trans_y;
+float curr_pitch, curr_roll, curr_yaw, prev_pitch, prev_roll, prev_yaw;
+float cam_h, prev_cam_h, diff_roll, diff_pitch, diff_roll_buf[12], diff_pitch_buf[12], opt_trans_x, opt_trans_y;
 
 // Lateral Velocity Computation
 #define Fx_ARdrone 343.1211
 #define Fy_ARdrone 348.5053
-float Velx, Vely;
+float Velx, Vely, Velz, Velz_buf[12];
+unsigned int Velz_buf_point = 0;
 
 int DIV_FILTER = 0;
+
+// Kalman fusion: Optic flow and Accelerometers
+
+
+struct FloatVect3 accel_update;
+struct FloatRates rate_update;
 
 // Called by plugin
 void my_plugin_init(void)
@@ -98,15 +112,19 @@ void my_plugin_init(void)
 	diff_roll = 0.0;
 	diff_pitch = 0.0;
 	cam_h = 0.0;
-	prev_pitch = 0;
-	prev_roll = 0;
-	curr_pitch = 0;
-	curr_roll = 0;
+	prev_cam_h = 0.0;
+	prev_pitch = 0.0;
+	prev_roll = 0.0;
+	prev_yaw = 0.0;
+	curr_pitch = 0.0;
+	curr_roll = 0.0;
+	curr_yaw = 0.0;
 	opt_trans_x = 0.0;
 	opt_trans_y = 0.0;
 
 	Velx = 0.0;
 	Vely = 0.0;
+	Velz = 0.0;
 
 	opt_angle_x_raw = 0;
 	opt_angle_y_raw = 0;
@@ -156,7 +174,7 @@ void my_plugin_run(unsigned char *frame)
     	int threshold_n_points = 25; //25
     	if(flow_point_size < threshold_n_points)
     	{
-    		findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
+        	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
     	}
     }
 
@@ -166,8 +184,6 @@ void my_plugin_run(unsigned char *frame)
     if(count)
     {
     	trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, x, y, new_x, new_y, dx, dy, status);
-
-//		showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
 
 		int tot_x=0;
 		int tot_y=0;
@@ -180,8 +196,6 @@ void my_plugin_run(unsigned char *frame)
 
 		for (int i=0; i<count;i++)
 		{
-//			dx[i] = (new_x[i]-x[i]);
-//			dy[i] = (new_y[i]-y[i]);
 			dx[i] = flow_points[i].dx;
 			dy[i] = flow_points[i].dy;
 
@@ -206,61 +220,66 @@ void my_plugin_run(unsigned char *frame)
 		opt_angle_y_raw = y_avg;
 
 		// Flow Derotation
-		curr_pitch = stateGetNedToBodyEulers_i()->theta;
-		curr_roll = stateGetNedToBodyEulers_i()->phi;
-		diff_pitch = (float)((curr_pitch - prev_pitch)*0.0139882*1000*10);
-		diff_roll = (float)((curr_roll - prev_roll)*0.0139882*1000*10);
 
-		diff_roll_buf[att_buf_point] = diff_roll;
-		diff_pitch_buf[att_buf_point] = diff_pitch;
-		att_buf_point = (att_buf_point+1) %12;
 
-		for (int i=0;i<12;i++) {
-			diff_roll+=diff_roll_buf[i]/12;
-			diff_pitch+=diff_pitch_buf[i]/12;
-		}
+//		curr_pitch = stateGetNedToBodyEulers_i()->theta*0.0139882;
+//		curr_roll = stateGetNedToBodyEulers_i()->phi*0.0139882;
+//		curr_yaw = stateGetNedToBodyEulers_i()->psi*0.0139882;
+//
+//		diff_pitch = (curr_pitch - prev_pitch)/FPS*scaley*Fy_ARdrone*240/38.4;
+//		diff_roll = (curr_roll - prev_roll)/FPS*scalex*Fx_ARdrone*320/51.2;
+//
+//		prev_pitch = curr_pitch;
+//		prev_roll = curr_roll;
+//		prev_yaw = curr_yaw;
+//
+//		opt_trans_x = opt_angle_x_raw - diff_roll;
+//		opt_trans_y = opt_angle_y_raw - diff_pitch;
+//
+//
+//		// Velocity Computation
+//#if USE_SONAR
+//		cam_h = ins_impl.sonar_z;
+//#else
+//		cam_h = 1;
+//		prev_cam_h = 1;
+//#endif
+//		Velz = (cam_h-prev_cam_h)*FPS;
+//		prev_cam_h = cam_h;
+//
+//		int velz_win = 6;
+//		Velz_buf[Velz_buf_point] = Velz;
+//		Velz_buf_point = (Velz_buf_point+1) %velz_win;
+//
+//		for (int i=0;i<velz_win;i++) {
+//			Velz+=Velz_buf[i]/velz_win;
+//		}
+//
+//		if(count)
+//		{
+//			Velx = opt_trans_x*cam_h/Fx_ARdrone;
+//			Vely = opt_trans_y*cam_h/Fy_ARdrone;
+//		}
+//		else
+//		{
+//			Velx = 0.0;
+//			Vely = 0.0;
+//		}
 
-		prev_pitch = curr_pitch;
-		prev_roll = curr_roll;
 
-		float diff_dx = (float)(opt_angle_x_raw - diff_roll);
-		float diff_dy = (float)(opt_angle_y_raw - diff_pitch);
+		// Kalman fusion: Optic flow and Accelerometers
+//	    ACCELS_FLOAT_OF_BFP(accel_update,imu.accel);
+//	    rate_update.p = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->p);
+//	    rate_update.q = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->q);
+//	    rate_update.r = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->r);
 
-		if((opt_angle_x_raw*diff_roll>0)&&(((opt_angle_x_raw>0)&&(diff_dx>0))||((opt_angle_x_raw<0)&&(diff_dx<0))))
-		{
-			opt_trans_x = diff_dx;
-		}
-		else
-		{
-			opt_trans_x = opt_angle_x_raw;
-		}
+//	    ACCELS_FLOAT_OF_BFP(accel_update,mean_accel);
+//	    RATES_FLOAT_OF_BFP(rate_update,mean_rate);
+//		INT_RATES_ZERO(mean_rate);
+//		INT32_VECT3_ZERO(mean_accel);
+//		count_input = 0;
 
-		if((opt_angle_y_raw*diff_pitch>0)&&(((opt_angle_y_raw>0)&&(diff_dy>0))||((opt_angle_y_raw<0)&&(diff_dy<0))))
-		{
-			opt_trans_y = diff_dy;
-		}
-		else
-		{
-			opt_trans_y = opt_angle_y_raw;
-		}
-
-		// Velocity Computation
-#if USE_SONAR
-		cam_h = ins_impl.sonar_z;
-#else
-		cam_h = 1;
-#endif
-		if(count)
-		{
-			Velx = opt_trans_x*cam_h/Fx_ARdrone;
-			Vely = opt_trans_y*cam_h/Fy_ARdrone;
-		}
-		else
-		{
-			Velx = 0.0;
-			Vely = 0.0;
-		}
-
+//		DOWNLINK_SEND_EKF_VISION_ACCEL(DefaultChannel, DefaultDevice, &accel_update.x, &accel_update.y, &accel_update.z, &rate_update.p, &rate_update.q, &rate_update.r, &curr_roll, &curr_pitch, &curr_yaw, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velz, &cam_h, &FPS);
 
 		//tele purpose
 
@@ -282,6 +301,9 @@ void my_plugin_run(unsigned char *frame)
 		// *********************************************
 
 		memcpy(prev_frame,frame,imgHeight*imgWidth*2);
+
+		//showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
+
 		int i;
 		for (i=0;i<count;i++)
 		{
@@ -290,10 +312,10 @@ void my_plugin_run(unsigned char *frame)
 			detected_points1[i] = swap_points[i];
 		}
 
-		DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velx, &Vely, &diff_roll, &diff_pitch, &cam_h, &count, &count, &divergence, &new_divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv, &DIV_FILTER);
+		DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velx, &Vely, &diff_roll, &diff_pitch, &cam_h, &count, &flow_point_size, &divergence, &new_divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv, &DIV_FILTER);
     }
 
-	DOWNLINK_SEND_OF_ERROR(DefaultChannel, DefaultDevice, &error_corner, &error_opticflow);
+	//DOWNLINK_SEND_OF_ERROR(DefaultChannel, DefaultDevice, &error_corner, &error_opticflow);
 
 	// Send to paparazzi
 	gst2ppz.ID = 0x0001;
