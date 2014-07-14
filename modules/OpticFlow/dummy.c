@@ -1,3 +1,0 @@
-void dummyFunction(void) {
-	return;
-}
