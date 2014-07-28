@@ -136,7 +136,7 @@ void run_land_guidance_onvision(void)
   {
 	  run_opticflow_land();
   }
-  else if(autopilot_mode == AP_MODE_ATTITUDE_Z_HOLD)
+  else if(autopilot_mode == AP_MODE_HOVER_Z_HOLD)
   {
 	  run_opticflow_hover();
   }
@@ -188,25 +188,25 @@ void run_opticflow_hover(void)
 		  Y_of = Y_of + Vely*dt_FPS;
 */
 	}
-//	ned_speed_opticflow.x = OF_dx;
-//	ned_speed_opticflow.y = OF_dy;
-//	ned_speed_opticflow.z = -Velz;
-//	stateSetSpeedNed_f(&ned_speed_opticflow);
+	ned_speed_opticflow.x = OF_dx;
+	ned_speed_opticflow.y = OF_dy;
+	ned_speed_opticflow.z = -Velz;
+	stateSetSpeedNed_f(&ned_speed_opticflow);
 
 	  OF_ddx = OF_dx - OF_dx_prev;
 	  OF_ddy = OF_dy - OF_dy_prev;
 //	  stab_att_sp_euler.phi = vision_dgain*OF_ddx/100 + vision_pgain*OF_dx/100;
 //	  stab_att_sp_euler.theta = vision_dgain*OF_ddy/100 + vision_pgain*OF_dy/100;
 
-	  cmd_euler.phi = (int)vision_phi_pgain*(-OF_dy);// + vision_phi_dgain*OF_ddx;
-	  cmd_euler.theta = (int)vision_theta_pgain*OF_dx;// + vision_theta_dgain*OF_ddy;
+//	  cmd_euler.phi = -vision_phi_pgain*(OF_dy*(1<<(INT32_SPEED_FRAC-INT32_POS_FRAC)));// + vision_phi_dgain*OF_ddx;
+//	  cmd_euler.theta = vision_theta_pgain*(OF_dx*(1<<(INT32_SPEED_FRAC-INT32_POS_FRAC)));// + vision_theta_dgain*OF_ddy;
 
 	  OF_dx_prev = OF_dx;
 	  OF_dy_prev = OF_dy;
 
-	  stabilization_attitude_set_rpy_setpoint_i(&cmd_euler);
+//	  stabilization_attitude_set_rpy_setpoint_i(&cmd_euler);
 
-	 DOWNLINK_SEND_VISION_STABILIZATION(DefaultChannel, DefaultDevice, &stateGetPositionEnu_i()->z, &ins_impl.baro_z, &cam_h, &stateGetNedToBodyEulers_i()->phi, &stateGetNedToBodyEulers_i()->theta, &stateGetNedToBodyEulers_i()->psi, &stateGetSpeedNed_i()->x, &stateGetSpeedNed_i()->y, &stateGetSpeedNed_f()->x, &stateGetSpeedNed_f()->y, &stateGetSpeedNed_f()->z);
+	 DOWNLINK_SEND_VISION_STABILIZATION(DefaultChannel, DefaultDevice, &stateGetPositionEnu_i()->z, &ins_impl.baro_z, &cam_h, &stateGetNedToBodyEulers_i()->phi, &stateGetNedToBodyEulers_i()->theta, &stateGetNedToBodyEulers_i()->psi, &cmd_euler.phi, &cmd_euler.theta, &stateGetSpeedNed_f()->x, &stateGetSpeedNed_f()->y, &stateGetSpeedNed_f()->z);
 }
 
 void run_opticflow_land(void)

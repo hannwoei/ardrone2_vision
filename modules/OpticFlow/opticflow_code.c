@@ -37,19 +37,21 @@ unsigned int verbose = 0;
 
 // Local variables
 //static unsigned char * img_uncertainty;
-unsigned char *prev_frame, *gray_frame, *prev_gray_frame;
+unsigned char *prev_frame, *copy_frame, *gray_frame, *prev_gray_frame;
 
 int old_img_init;
 
 float opt_angle_x_raw;
 float opt_angle_y_raw;
-
+float tot_x, tot_y, x_avg, y_avg;
 float x_buf[24];
 float y_buf[24];
 float x_buf_med[24];
 float y_buf_med[24];
 float camh_buf[24];
 float Velz_buf[6];
+
+float xFromOF, yFromOF, prev_xFromOF, prev_yFromOF;
 
 int opt_trans_x_buf[32];
 int opt_trans_y_buf[32];
@@ -105,6 +107,8 @@ int logID;
 FILE *fr;
 #endif
 
+// Flow fitting
+float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error;
 
 // Called by plugin
 void my_plugin_init(void)
@@ -118,7 +122,13 @@ void my_plugin_init(void)
 	gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
 	prev_gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
 	prev_frame = (unsigned char *) calloc(imgWidth*imgHeight*2,sizeof(unsigned char));
+	copy_frame = (unsigned char *) calloc(imgWidth*imgHeight*2,sizeof(unsigned char));
 	old_img_init = 1;
+
+	tot_x=0.0;
+	tot_y=0.0;
+	x_avg = 0.0;
+	y_avg = 0.0;
 
 	diff_roll = 0.0;
 	diff_pitch = 0.0;
@@ -140,6 +150,19 @@ void my_plugin_init(void)
 	Velx = 0.0;
 	Vely = 0.0;
 	Velz = 0.0;
+
+	mean_tti = 0.0;
+	median_tti = 0.0;
+	d_heading = 0.0;
+	d_pitch = 0.0;
+	divergence_error = 0.0;
+	pu[0] = 0.0; pu[1] = 0.0; pu[2] = 0.0;
+	pv[0] = 0.0; pv[1] = 0.0; pv[2] = 0.0;
+
+	xFromOF = 0.0;
+	yFromOF = 0.0;
+	prev_xFromOF =0.0;
+	prev_yFromOF = 0.0;
 
 	opt_angle_x_raw = 0.0;
 	opt_angle_y_raw = 0.0;
@@ -166,11 +189,50 @@ void my_plugin_init(void)
 
 void my_plugin_run(unsigned char *frame)
 {
+	memcpy(copy_frame,frame,imgHeight*imgWidth*2);
+
 	if(old_img_init == 1)
 	{
 		memcpy(prev_frame,frame,imgHeight*imgWidth*2);
 		old_img_init = 0;
 	}
+
+	// ***********************************************************************************************************************
+	// Additional information from other sensors
+	// ***********************************************************************************************************************
+
+#if USE_SONAR
+		cam_h = ins_impl.sonar_z;
+#else
+		cam_h = 1;
+		prev_cam_h = 1;
+#endif
+
+		camh_buf[buf_point_camh] = cam_h;
+		buf_point_camh = (buf_point_camh+1) %11;
+		quick_sort(camh_buf,11);
+		cam_h_med = camh_buf[6];
+
+		Velz = (cam_h_med-prev_cam_h)*FPS;
+		prev_cam_h = cam_h_med;
+
+		int velz_win = 6;
+		Velz_buf[Velz_buf_point] = Velz;
+		Velz_buf_point = (Velz_buf_point+1) %velz_win;
+
+		for (int i=0;i<velz_win;i++) {
+			Velz+=Velz_buf[i]/velz_win;
+		}
+
+	// initialization of euler's angles estimation requires a few seconds!!!
+	curr_pitch = (float)stateGetNedToBodyEulers_i()->theta*0.0139882; // degrees
+	curr_roll = (float)stateGetNedToBodyEulers_i()->phi*0.0139882;
+	curr_yaw = (float)stateGetNedToBodyEulers_i()->psi*0.0139882;
+
+    ACCELS_FLOAT_OF_BFP(accel_update,imu.accel);
+    rate_update.p = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->p);
+    rate_update.q = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->q);
+    rate_update.r = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->r);
 
 	// ***********************************************************************************************************************
 	// (1) possibly find new points - keeping possible old ones (normal cv methods / efficient point finding / active corners)
@@ -200,190 +262,161 @@ void my_plugin_run(unsigned char *frame)
     {
     	trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, x, y, new_x, new_y, dx, dy, status);
 
-//		showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
+    	showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
 
-		float tot_x=0.0;
-		float tot_y=0.0;
-		float x_avg = 0.0;
-		float y_avg = 0.0;
+    	if(count)
+    	{
 
-		// initialization of euler's angles estimation requires a few seconds!!!
-		curr_pitch = (float)stateGetNedToBodyEulers_i()->theta*0.0139882; // degrees
-		curr_roll = (float)stateGetNedToBodyEulers_i()->phi*0.0139882;
-		curr_yaw = (float)stateGetNedToBodyEulers_i()->psi*0.0139882;
+			tot_x=0.0;
+			tot_y=0.0;
+			x_avg = 0.0;
+			y_avg = 0.0;
 
-//		diff_pitch = (curr_pitch - prev_pitch)*Fy_ARdrone/180*3.142; // change to rad
-//		diff_roll = (curr_roll - prev_roll)*Fx_ARdrone/180*3.142;
-//		diff_yaw = (curr_yaw - prev_yaw)/180*3.142;
+	//		diff_pitch = (curr_pitch - prev_pitch)*Fy_ARdrone/180*3.142; // change to rad
+	//		diff_roll = (curr_roll - prev_roll)*Fx_ARdrone/180*3.142;
+	//		diff_yaw = (curr_yaw - prev_yaw)/180*3.142;
 
-//		prev_pitch = curr_pitch;
-//		prev_roll = curr_roll;
-//		prev_yaw = curr_yaw;
-
-
-		//magical scaling needed in order to calibrate opt flow angles to imu angles
-//		int scalex = 1024; //1024*(1/0.75) //default 1024
-//		int scaley = 1024; //1024*(1/0.76) //default 1024
+	//		prev_pitch = curr_pitch;
+	//		prev_roll = curr_roll;
+	//		prev_yaw = curr_yaw;
 
 #ifdef log_corners
-		//log corners' coordinates and optical flow
-		fr = fopen("data/video/corners.txt","a+");
-		if( fr == NULL )
-		{
-			fprintf(stderr, "Can't open input file in.list!\n");
-			exit(1);
-		}
+			//log corners' coordinates and optical flow
+			fr = fopen("data/video/corners.txt","a+");
+			if( fr == NULL )
+			{
+				fprintf(stderr, "Can't open input file in.list!\n");
+				exit(1);
+			}
 #endif
 
-		for (int i=0; i<count;i++)
-		{
-
-			// change to body reference frame
-			dx[i] = flow_points[i].dy;// - diff_yaw*flow_points[i].y;
-			dy[i] = -flow_points[i].dx;// - diff_yaw*flow_points[i].x;
+			for (int i=0; i<count;i++)
+			{
+				// change to body reference frame
+				dx[i] = flow_points[i].dy;// - diff_yaw*flow_points[i].y;
+				dy[i] = -flow_points[i].dx;// - diff_yaw*flow_points[i].x;
 
 #ifdef log_corners
-			// log corners' coordinates and optic flow
-			fprintf(fr, "%d %d %d %d %d %d\n", logID, i, flow_points[i].x,flow_points[i].y,flow_points[i].dx,flow_points[i].dy);
+				// log corners' coordinates and optic flow
+				fprintf(fr, "%d %d %d %d %d %d\n", logID, i, flow_points[i].x,flow_points[i].y,flow_points[i].dx,flow_points[i].dy);
 #endif
-			tot_x = tot_x + (float) dx[i];
-			tot_y = tot_y + (float) dy[i];
+				tot_x = tot_x + (float) dx[i];
+				tot_y = tot_y + (float) dy[i];
 
-		}
+			}
 
-		// using moving average to filter out the noise
-
-		if(count)
-		{
-//			x_buf[buf_point] = (tot_x*scalex)/count;
-//			y_buf[buf_point] = (tot_y*scaley)/count;
+			// using moving average to filter out the noise
 			x_buf[buf_point] = tot_x/count;
 			y_buf[buf_point] = tot_y/count;
 			buf_point = (buf_point+1) %5;
 			x_buf_med[buf_point_med] = tot_x/count;
 			y_buf_med[buf_point_med] = tot_y/count;
 			buf_point_med = (buf_point_med+1) %11;
-		}
-
-		for (int i=0;i<5;i++) {
-			x_avg+=x_buf[i]*0.2;
-			y_avg+=y_buf[i]*0.2;
-		}
-
-		quick_sort(x_buf_med,11);
-		quick_sort(y_buf_med,11);
-		opt_trans_x = x_buf_med[6];
-		opt_trans_y = y_buf_med[6];
-
-		//raw optic flow (for telemetry purpose)
-		opt_angle_x_raw = x_avg;
-		opt_angle_y_raw = y_avg;
-
-		// Flow Derotation
-
-//		curr_pitch = stateGetNedToBodyEulers_i()->theta*0.0139882;
-//		curr_roll = stateGetNedToBodyEulers_i()->phi*0.0139882;
-//		curr_yaw = stateGetNedToBodyEulers_i()->psi*0.0139882;
-
-//		diff_pitch = (curr_pitch - prev_pitch)/FPS*scaley*Fy_ARdrone*240/38.4;
-//		diff_roll = (curr_roll - prev_roll)/FPS*scalex*Fx_ARdrone*320/51.2;
-//
-//		prev_pitch = curr_pitch;
-//		prev_roll = curr_roll;
-//		prev_yaw = curr_yaw;
-//
-//		opt_trans_x = opt_angle_x_raw - diff_roll;
-//		opt_trans_y = opt_angle_y_raw - diff_pitch;
 
 
-		// Velocity Computation
-#if USE_SONAR
-		cam_h = ins_impl.sonar_z;
-#else
-		cam_h = 1;
-		prev_cam_h = 1;
-#endif
+			for (int i=0;i<5;i++) {
+				x_avg+=x_buf[i]*0.2;
+				y_avg+=y_buf[i]*0.2;
+			}
 
-		camh_buf[buf_point_camh] = cam_h;
-		buf_point_camh = (buf_point_camh+1) %11;
-		quick_sort(camh_buf,11);
-		cam_h_med = camh_buf[6];
+			quick_sort(x_buf_med,11);
+			quick_sort(y_buf_med,11);
+			opt_trans_x = x_buf_med[6];
+			opt_trans_y = y_buf_med[6];
 
-		Velz = (cam_h_med-prev_cam_h)*FPS;
-		prev_cam_h = cam_h_med;
 
-		int velz_win = 6;
-		Velz_buf[Velz_buf_point] = Velz;
-		Velz_buf_point = (Velz_buf_point+1) %velz_win;
+			//raw optic flow (for telemetry purpose)
+			opt_angle_x_raw = x_avg;
+			opt_angle_y_raw = y_avg;
 
-		for (int i=0;i<velz_win;i++) {
-			Velz+=Velz_buf[i]/velz_win;
-		}
+			// Flow Derotation
 
-		if(count)
-		{
+	//		curr_pitch = stateGetNedToBodyEulers_i()->theta*0.0139882;
+	//		curr_roll = stateGetNedToBodyEulers_i()->phi*0.0139882;
+	//		curr_yaw = stateGetNedToBodyEulers_i()->psi*0.0139882;
+
+	//		diff_pitch = (curr_pitch - prev_pitch)/FPS*scaley*Fy_ARdrone*240/38.4;
+	//		diff_roll = (curr_roll - prev_roll)/FPS*scalex*Fx_ARdrone*320/51.2;
+	//
+	//		prev_pitch = curr_pitch;
+	//		prev_roll = curr_roll;
+	//		prev_yaw = curr_yaw;
+	//
+	//		opt_trans_x = opt_angle_x_raw - diff_roll;
+	//		opt_trans_y = opt_angle_y_raw - diff_pitch;
+
+
+			// Velocity Computation
+
 			Velx = opt_trans_x*cam_h_med/Fx_ARdrone;
 			Vely = opt_trans_y*cam_h_med/Fy_ARdrone;
-		}
-		else
-		{
-			Velx = 0.0;
-			Vely = 0.0;
-		}
 
-		// Kalman fusion: Optic flow and Accelerometers
-	    ACCELS_FLOAT_OF_BFP(accel_update,imu.accel);
-	    rate_update.p = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->p);
-	    rate_update.q = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->q);
-	    rate_update.r = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->r);
+			// Kalman fusion: Optic flow and Accelerometers
 
-//	    ACCELS_FLOAT_OF_BFP(accel_update,mean_accel);
-//	    RATES_FLOAT_OF_BFP(rate_update,mean_rate);
-//		INT_RATES_ZERO(mean_rate);
-//		INT32_VECT3_ZERO(mean_accel);
-//		count_input = 0;
 
-		//DOWNLINK_SEND_EKF_VISION_ACCEL(DefaultChannel, DefaultDevice, &accel_update.x, &accel_update.y, &accel_update.z, &rate_update.p, &rate_update.q, &rate_update.r, &curr_roll, &curr_pitch, &curr_yaw, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velz, &cam_h, &FPS);
-		//DOWNLINK_SEND_LOG_VISION(DefaultChannel, DefaultDevice, &logID, &gps.ecef_pos.x, &gps.ecef_pos.y, &gps.ecef_pos.z, &gps.ecef_vel.x, &gps.ecef_vel.y, &gps.ecef_vel.z, &gps.lla_pos.lat, &gps.lla_pos.lon, &gps.lla_pos.alt, &accel_update.x, &accel_update.y, &accel_update.z, &rate_update.p, &rate_update.q, &rate_update.r, &curr_roll, &curr_pitch, &curr_yaw, &count, &opt_angle_x_raw, &opt_angle_y_raw, &Velz, &cam_h, &FPS);
-	    logID++;
-#ifdef log_corners
-		fclose(fr);
-#endif
+	//	    ACCELS_FLOAT_OF_BFP(accel_update,mean_accel);
+	//	    RATES_FLOAT_OF_BFP(rate_update,mean_rate);
+	//		INT_RATES_ZERO(mean_rate);
+	//		INT32_VECT3_ZERO(mean_accel);
+	//		count_input = 0;
 
-		//tele purpose
+			//DOWNLINK_SEND_EKF_VISION_ACCEL(DefaultChannel, DefaultDevice, &accel_update.x, &accel_update.y, &accel_update.z, &rate_update.p, &rate_update.q, &rate_update.r, &curr_roll, &curr_pitch, &curr_yaw, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velz, &cam_h, &FPS);
+			//DOWNLINK_SEND_LOG_VISION(DefaultChannel, DefaultDevice, &logID, &gps.ecef_pos.x, &gps.ecef_pos.y, &gps.ecef_pos.z, &gps.ecef_vel.x, &gps.ecef_vel.y, &gps.ecef_vel.z, &gps.lla_pos.lat, &gps.lla_pos.lon, &gps.lla_pos.alt, &accel_update.x, &accel_update.y, &accel_update.z, &rate_update.p, &rate_update.q, &rate_update.r, &curr_roll, &curr_pitch, &curr_yaw, &count, &opt_angle_x_raw, &opt_angle_y_raw, &Velz, &cam_h, &FPS);
+			logID++;
+	#ifdef log_corners
+			fclose(fr);
+	#endif
 
-		float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error;
+			int USE_FITTING = 0;
 
-		int USE_FITTING = 0;
+			if(USE_FITTING == 1)
+			{
+				analyseTTI(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
+			}
 
-		if(USE_FITTING == 1)
-		{
-			analyseTTI(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
-		}
-
+    	}
 		// new method for computing divergence
 		// lineDivergence(&new_divergence, x, y, new_x, new_y, count);
 
 
-		// *********************************************
-		// (5) housekeeping to prepare for the next call
-		// *********************************************
 
-		memcpy(prev_frame,frame,imgHeight*imgWidth*2);
-		int i;
-		for (i=0;i<count;i++)
-		{
-			swap_points[i] = detected_points0[i];
-			detected_points0[i] = detected_points1[i];
-			detected_points1[i] = swap_points[i];
-		}
-
-
-		DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velx, &Vely, &Velz, &diff_pitch, &cam_h, &count, &flow_point_size, &cam_h_med, &new_divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv, &DIV_FILTER);
 
     }
+    else
+    {
+    	opt_trans_x = 0.0;
+    	opt_trans_y = 0.0;
+    	opt_angle_x_raw = 0.0;
+    	opt_angle_y_raw = 0.0;
+		Velx = 0.0;
+		Vely = 0.0;
+    }
 
-	DOWNLINK_SEND_OF_ERROR(DefaultChannel, DefaultDevice, &error_corner, &error_opticflow);
+
+	xFromOF = prev_xFromOF + Velx/FPS;
+	yFromOF = prev_yFromOF + Vely/FPS;
+	prev_xFromOF = xFromOF;
+	prev_yFromOF = yFromOF;
+
+	// *********************************************
+	// (5) housekeeping to prepare for the next call
+	// *********************************************
+
+	memcpy(prev_frame,copy_frame,imgHeight*imgWidth*2);
+
+
+
+	for (int i=0;i<count;i++)
+	{
+		swap_points[i] = detected_points0[i];
+		detected_points0[i] = detected_points1[i];
+		detected_points1[i] = swap_points[i];
+	}
+
+
+	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velx, &Vely, &Velz, &diff_pitch, &cam_h_med, &count, &flow_point_size, &divergence, &new_divergence, &xFromOF, &yFromOF, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv, &DIV_FILTER);
+
+//	DOWNLINK_SEND_OF_ERROR(DefaultChannel, DefaultDevice, &error_corner, &error_opticflow);
 
 	// Send to paparazzi
 	gst2ppz.ID = 0x0001;
