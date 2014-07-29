@@ -2015,9 +2015,7 @@ float temp_divergence = 0.0;
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, int *DIV_FILTER)
 {
 		// divergence:
-
 		*divergence = pu[0] + pv[1];
-//printf("div = %f\n",*divergence);
 		// minimal measurable divergence:
 		float minimal_divergence = 2E-3;
 		if(abs(*divergence) > minimal_divergence)
