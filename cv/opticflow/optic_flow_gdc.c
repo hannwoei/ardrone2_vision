@@ -2089,7 +2089,6 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		else if(kalmanfilter == 1)
 		{
 			*DIV_FILTER = 4;
-
 		}
 
 /*

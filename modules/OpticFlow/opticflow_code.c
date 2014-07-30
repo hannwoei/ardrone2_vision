@@ -39,7 +39,7 @@ unsigned int verbose = 0;
 
 // Local variables
 //static unsigned char * img_uncertainty;
-#define showframe 1
+// #define showframe 1
 unsigned char *prev_frame, *gray_frame, *prev_gray_frame;
 #ifdef showframe
 unsigned char *copy_frame;
@@ -190,7 +190,7 @@ void my_plugin_run(unsigned char *frame)
     }
     else
     {
-    	int threshold_n_points = 25; //25
+    	int threshold_n_points = 10; //25
     	if(flow_point_size < threshold_n_points)
     	{
         	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
@@ -200,17 +200,16 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 	// (2) track the points to the new image, possibly using external information (TTC, known lateral / rotational movements)
 	// **********************************************************************************************************************
-    if(count)
-    {
     	trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, x, y, new_x, new_y, dx, dy, status);
 
 #ifdef showframe
     	showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
 #endif
+
     	if(count)
     	{
-			tot_x=0.0;
-			tot_y=0.0;
+			tot_x = 0.0;
+			tot_y = 0.0;
 			x_avg = 0.0;
 			y_avg = 0.0;
 
@@ -301,22 +300,20 @@ void my_plugin_run(unsigned char *frame)
 
 	//		DOWNLINK_SEND_EKF_VISION_ACCEL(DefaultChannel, DefaultDevice, &accel_update.x, &accel_update.y, &accel_update.z, &rate_update.p, &rate_update.q, &rate_update.r, &curr_roll, &curr_pitch, &curr_yaw, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velz, &cam_h, &FPS);
 
-			//tele purpose
 
-			int USE_FITTING = 1;
 
-			if(USE_FITTING == 1)
-			{
-				analyseTTI(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
-			}
-
-			// new method for computing divergence
-			// lineDivergence(&new_divergence, x, y, new_x, new_y, count);
 
     	}
 
-  }
+    // compute divergence/ TTI
+	int USE_FITTING = 1;
+	if(USE_FITTING == 1)
+	{
+		analyseTTI(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
+	}
 
+	// new method for computing divergence
+	// lineDivergence(&new_divergence, x, y, new_x, new_y, count);
 
 
 	// *********************************************
