@@ -86,4 +86,3 @@ GTK_LDFLAGS =  `pkg-config gtk+-2.0 --libs` -lglibivy -lpcre
 ifneq ($(MAKECMDGOALS),clean)
 -include .depend
 endif
-
