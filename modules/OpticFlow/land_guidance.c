@@ -80,6 +80,7 @@ float Y_of;
 float dt_FPS;
 
 struct Int32Eulers cmd_euler;
+struct Int32Vect2 cmd_euler2;
 
 int USE_TRANSLATIONAL;
 
@@ -106,6 +107,7 @@ void init_land_guidance()
   dt_FPS = 0.0;
 
   INT_EULERS_ZERO(cmd_euler);
+  INT_VECT2_ZERO(cmd_euler2);
 
   div_err = 0.0;
   div_err_prev = 0.0;
@@ -165,8 +167,8 @@ void run_opticflow_hover(void)
 	USE_TRANSLATIONAL = 1;
 	if (USE_TRANSLATIONAL == 0)
 	{
-		  OF_dx = (float)opt_angle_x_raw;
-		  OF_dy = (float)opt_angle_y_raw;
+		  OF_dx = opt_angle_x_raw;
+		  OF_dy = opt_angle_y_raw;
 	}
 	else
 	{
@@ -192,15 +194,18 @@ void run_opticflow_hover(void)
 //	  stab_att_sp_euler.phi = vision_dgain*OF_ddx/100 + vision_pgain*OF_dx/100;
 //	  stab_att_sp_euler.theta = vision_dgain*OF_ddy/100 + vision_pgain*OF_dy/100;
 
-	  cmd_euler.phi = vision_phi_pgain*OF_dx + vision_phi_dgain*OF_ddx;
-	  cmd_euler.theta = vision_theta_pgain*OF_dy + vision_theta_dgain*OF_ddy;
+	  cmd_euler.phi = -(int) (vision_phi_pgain*(OF_dy*(1<<(INT32_SPEED_FRAC))));// + vision_phi_dgain*OF_ddx;
+	  cmd_euler.theta = (int) (vision_theta_pgain*(OF_dx*(1<<(INT32_SPEED_FRAC))));// + vision_theta_dgain*OF_ddy;
+	  cmd_euler2.x = -(int) (vision_phi_pgain*(OF_dy*(1<<(INT32_SPEED_FRAC))));// + vision_phi_dgain*OF_ddx;
+	  cmd_euler2.y = (int) (vision_theta_pgain*(OF_dx*(1<<(INT32_SPEED_FRAC))));// + vision_theta_dgain*OF_ddy;
 
 	  OF_dx_prev = OF_dx;
 	  OF_dy_prev = OF_dy;
 
 	  stabilization_attitude_set_rpy_setpoint_i(&cmd_euler);
+//	  stabilization_attitude_set_earth_cmd_i(&cmd_euler2, 0);
 
-	 DOWNLINK_SEND_VISION_STABILIZATION(DefaultChannel, DefaultDevice, &stateGetPositionEnu_i()->z, &ins_impl.baro_z, &cam_h, &stateGetNedToBodyEulers_i()->phi, &stateGetNedToBodyEulers_i()->theta, &stateGetNedToBodyEulers_i()->psi, &cmd_euler.phi, &cmd_euler.theta, &X_of, &Y_of, &dt_FPS);
+	 DOWNLINK_SEND_VISION_STABILIZATION(DefaultChannel, DefaultDevice, &stateGetPositionEnu_i()->z, &ins_impl.baro_z, &cam_h, &stateGetNedToBodyEulers_i()->phi, &stateGetNedToBodyEulers_i()->theta, &stateGetNedToBodyEulers_i()->psi, &cmd_euler.phi, &cmd_euler.theta, &OF_dx, &OF_dy, &dt_FPS);
 }
 
 void run_opticflow_land(void)

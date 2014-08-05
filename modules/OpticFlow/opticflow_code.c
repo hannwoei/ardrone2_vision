@@ -6,7 +6,7 @@
 // Computer Vision
 #include "opticflow/optic_flow_gdc.h"
 #include "trig.h"
-#include "opticflow/fastRosten.h"
+//#include "opticflow/fastRosten.h"
 #include "opticflow_module.h"
 
 // Own Header
@@ -18,11 +18,6 @@
 #include "math/pprz_algebra_int.h"
 #include "math/pprz_algebra_float.h"
 #include "subsystems/imu.h"
-
-// Communication
-#include "video_message_structs.h"
-struct gst2ppz_message_struct gst2ppz;
-struct ppz2gst_message_struct ppz2gst;
 
 // Downlink
 #include "messages.h"
@@ -39,7 +34,7 @@ unsigned int verbose = 0;
 
 // Local variables
 //static unsigned char * img_uncertainty;
-// #define showframe 1
+//#define showframe 1
 unsigned char *prev_frame, *gray_frame, *prev_gray_frame;
 #ifdef showframe
 unsigned char *copy_frame;
@@ -47,9 +42,11 @@ unsigned char *copy_frame;
 
 int old_img_init;
 
-int opt_angle_x_raw, opt_angle_y_raw, tot_x, tot_y, x_avg, y_avg, x_buf[24], y_buf[24], opt_trans_x_buf[32], opt_trans_y_buf[32];
+int tot_x, tot_y, x_buf[24], y_buf[24], opt_trans_x_buf[32], opt_trans_y_buf[32];
+float opt_angle_x_raw, opt_angle_y_raw, x_avg, y_avg, camh_buf[24], cam_h_med;
 
 unsigned int buf_point = 0;
+unsigned int buf_point_camh = 0;
 
 int *x, *y, *new_x, *new_y, *status, *dx, *dy, *dx_scaled, *dy_scaled, *n_inlier_minu, *n_inlier_minv, *active;
 float divergence, new_divergence;
@@ -95,13 +92,14 @@ struct FloatRates rate_update;
 // Flow fitting
 float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error;
 
+// tryout
+struct NedCoor_i OF_speed;
+
 // Called by plugin
 void my_plugin_init(void)
 {
 
 	// Init variables
-	ppz2gst.pitch = 0;
-	ppz2gst.roll = 0;
 	gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
 	prev_gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
 	prev_frame = (unsigned char *) calloc(imgWidth*imgHeight*2,sizeof(unsigned char));
@@ -110,10 +108,12 @@ void my_plugin_init(void)
 #endif
 	old_img_init = 1;
 
-	tot_x=0.0;
-	tot_y=0.0;
+	tot_x = 0;
+	tot_y = 0;
 	x_avg = 0.0;
 	y_avg = 0.0;
+	opt_angle_x_raw = 0.0;
+	opt_angle_y_raw = 0,0;
 
 	diff_roll = 0.0;
 	diff_pitch = 0.0;
@@ -127,6 +127,8 @@ void my_plugin_init(void)
 	curr_yaw = 0.0;
 	opt_trans_x = 0.0;
 	opt_trans_y = 0.0;
+
+	cam_h_med = 0.0;
 
 	Velx = 0.0;
 	Vely = 0.0;
@@ -142,8 +144,6 @@ void my_plugin_init(void)
 
 	opt_angle_x_raw = 0;
 	opt_angle_y_raw = 0;
-
-	gst2ppz.counter = 0;
 
 	mark_points = 0;
 
@@ -161,6 +161,11 @@ void my_plugin_init(void)
 
 	divergence = 0.0;
 	new_divergence = 0.0;
+
+	// tryout
+	OF_speed.x = 0;
+	OF_speed.y = 0;
+	OF_speed.z = 0;
 }
 
 void my_plugin_run(unsigned char *frame)
@@ -177,6 +182,22 @@ void my_plugin_run(unsigned char *frame)
 	}
 
 	// ***********************************************************************************************************************
+	// Additional information from other sensors
+	// ***********************************************************************************************************************
+
+#if USE_SONAR
+		cam_h = ins_impl.sonar_z;
+#else
+		cam_h = 1;
+		prev_cam_h = 1;
+#endif
+
+		camh_buf[buf_point_camh] = cam_h;
+		buf_point_camh = (buf_point_camh+1) %11;
+		quick_sort(camh_buf,11);
+		cam_h_med = camh_buf[6];
+
+	// ***********************************************************************************************************************
 	// (1) possibly find new points - keeping possible old ones (normal cv methods / efficient point finding / active corners)
 	// ***********************************************************************************************************************
 
@@ -190,7 +211,7 @@ void my_plugin_run(unsigned char *frame)
     }
     else
     {
-    	int threshold_n_points = 10; //25
+    	int threshold_n_points = 15; //25
     	if(flow_point_size < threshold_n_points)
     	{
         	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
@@ -200,45 +221,22 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 	// (2) track the points to the new image, possibly using external information (TTC, known lateral / rotational movements)
 	// **********************************************************************************************************************
-    	trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, x, y, new_x, new_y, dx, dy, status);
+    trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, detected_points1, x, y, new_x, new_y, dx, dy, status);
 
 #ifdef showframe
     	showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
 #endif
+		for (int i=0; i<count;i++)
+		{
+			dx[i] = flow_points[i].dx;
+			dy[i] = flow_points[i].dy;
+		}
 
-    	if(count)
-    	{
-			tot_x = 0.0;
-			tot_y = 0.0;
-			x_avg = 0.0;
-			y_avg = 0.0;
+//    	OFfilter(&opt_angle_x_raw, &opt_angle_y_raw, flow_points, count, 1);
+    	OFfilter(&opt_angle_x_raw, &opt_angle_y_raw, flow_points, count, 2);
 
-			for (int i=0; i<count;i++)
-			{
-				dx[i] = flow_points[i].dx;
-				dy[i] = flow_points[i].dy;
-
-				tot_x = tot_x + dx[i];
-				tot_y = tot_y + dy[i];
-			}
-			// using moving average to filter out the noise
-			if(count)
-			{
-				x_buf[buf_point] = tot_x/count;
-				y_buf[buf_point] = tot_y/count;
-				buf_point = (buf_point+1) %5;
-			}
-
-			for (int i=0;i<5;i++) {
-				x_avg+=x_buf[i]*0.2;
-				y_avg+=y_buf[i]*0.2;
-			}
-
-			//raw optic flow (for telemetry purpose)
-			opt_angle_x_raw = x_avg;
-			opt_angle_y_raw = y_avg;
-
-			// Flow Derotation
+		/*
+		// Flow Derotation
 
 
 	//		curr_pitch = stateGetNedToBodyEulers_i()->theta*0.0139882;
@@ -299,11 +297,16 @@ void my_plugin_run(unsigned char *frame)
 	//		count_input = 0;
 
 	//		DOWNLINK_SEND_EKF_VISION_ACCEL(DefaultChannel, DefaultDevice, &accel_update.x, &accel_update.y, &accel_update.z, &rate_update.p, &rate_update.q, &rate_update.r, &curr_roll, &curr_pitch, &curr_yaw, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velz, &cam_h, &FPS);
+*/
+	// Velocity Computation
 
+	Velx = opt_angle_y_raw*cam_h_med/Fy_ARdrone*FPS;
+	Vely = -opt_angle_x_raw*cam_h_med/Fx_ARdrone*FPS;
 
+	OF_speed.x = (int) (Velx*(1<<(INT32_SPEED_FRAC)));
+	OF_speed.y = (int) (Vely*(1<<(INT32_SPEED_FRAC)));
 
-
-    	}
+	stateSetSpeedNed_i(&OF_speed);
 
     // compute divergence/ TTI
 	int USE_FITTING = 1;
@@ -332,13 +335,7 @@ void my_plugin_run(unsigned char *frame)
 		detected_points1[i] = swap_points[i];
 	}
 
-	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velx, &Vely, &diff_roll, &diff_pitch, &cam_h, &count, &flow_point_size, &divergence, &new_divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv, &DIV_FILTER);
-
-	//DOWNLINK_SEND_OF_ERROR(DefaultChannel, DefaultDevice, &error_corner, &error_opticflow);
-
-	// Send to paparazzi
-	gst2ppz.ID = 0x0001;
-	gst2ppz.counter++; // to keep track of data through ppz communication
+	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &OF_speed.x, &OF_speed.y, &stateGetSpeedNed_i()->x, &stateGetSpeedNed_i()->y, &diff_roll, &diff_pitch, &cam_h_med, &count, &flow_point_size, &divergence, &new_divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv, &DIV_FILTER);
 
 }
 

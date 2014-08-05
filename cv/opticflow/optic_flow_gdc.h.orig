@@ -59,11 +59,17 @@ void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int i
 void yuyv_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst);
 void setPointsToFlowPoints(struct flowPoint flow_points[], struct detectedPoint detected_points[], int *flow_point_size, int *count, int MAX_COUNT);
 void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[]);
-void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points0[],struct detectedPoint detected_points1[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
+void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
 void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int* DIV_FILTER);
 void lineDivergence(float *divergence, int *x, int *y, int *new_x, int *new_y, int count);
+<<<<<<< Updated upstream
+=======
 void subimage(unsigned char *gray_frame, unsigned char *subframe, int subimH, int subimW, int wInit, int hInit);
 void findDistributedPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *status);
 void trackDistributedPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
-void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint flow_points[], int count, int OF_FilterType);
+float Determinant(float **a,int n);
+void CoFactor(float **a,int n,float **b);
+void Transpose(float **a,int n);
+void MatInv(float **a, float d, int n, float **b);
+>>>>>>> Stashed changes
 #endif

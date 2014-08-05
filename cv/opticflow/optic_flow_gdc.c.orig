@@ -5,8 +5,7 @@
 #include "optic_flow_gdc.h"
 #include "defs_and_types.h"
 #include "nrutil.h"
-//#include "opticflow/fastRosten.h"
-#include "opticflow/fast12/fastRosten.h"
+#include "opticflow/fastRosten.h"
 #include "../../modules/OpticFlow/opticflow_module.h"
 
 #define int_index(x,y) (y * IMG_WIDTH + x)
@@ -1329,18 +1328,18 @@ extern void showFlow(unsigned char * frame_buf, int* x, int* y, int* status, int
       {
         for(j = -1; j <= 1; j++)
         {
-//          if(status[p] == 1)
-//          {
-//            ix = uint_index((unsigned int) (x[p]+i), (unsigned int) (y[p]+j));
-//            redPixel(frame_buf, ix);
-//            ix = uint_index((unsigned int) (new_x[p]+i), (unsigned int) (new_y[p]+j));
-//            greenPixel(frame_buf, ix);
-//          }
-//          else
-//          {
+          if(status[p] == 1)
+          {
             ix = uint_index((unsigned int) (x[p]+i), (unsigned int) (y[p]+j));
             redPixel(frame_buf, ix);
-//          }
+            ix = uint_index((unsigned int) (new_x[p]+i), (unsigned int) (new_y[p]+j));
+            greenPixel(frame_buf, ix);
+          }
+          else
+          {
+            ix = uint_index((unsigned int) (x[p]+i), (unsigned int) (y[p]+j));
+            bluePixel(frame_buf, ix);
+          }
         }
       }
     }
@@ -2016,7 +2015,9 @@ float temp_divergence = 0.0;
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, int *DIV_FILTER)
 {
 		// divergence:
+
 		*divergence = pu[0] + pv[1];
+//printf("div = %f\n",*divergence);
 		// minimal measurable divergence:
 		float minimal_divergence = 2E-3;
 		if(abs(*divergence) > minimal_divergence)
@@ -2090,6 +2091,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		else if(kalmanfilter == 1)
 		{
 			*DIV_FILTER = 4;
+
 		}
 
 /*
@@ -2263,12 +2265,17 @@ void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int im
 	// a)
 
 	// FAST corner:
-	int fast_threshold = 10; //10
+	int fast_threshold = 15; //10
 	xyFAST* pnts_fast;
 
 	CvtYUYV2Gray(gray_frame, frame, imW, imH); // convert to gray scaled image is a must for FAST corner
 
-	pnts_fast = fast12_detect((const byte*)gray_frame, imW, imH, imW, fast_threshold, count); //widthstep for gray-scaled image = its width; int widthstep = ((width*sizeof(unsigned char)*nchannels)%4!=0)?((((width*sizeof(unsigned char)*nchannels)/4)*4) + 4):(width*sizeof(unsigned char)*nchannels);
+//	if(!prev_gray_frame)
+//	{
+//		memcpy(prev_gray_frame,gray_frame,imgHeight*imgWidth);
+//	}
+
+	pnts_fast = fast9_detect((const byte*)gray_frame, imW, imH, imW, fast_threshold, count); //widthstep for gray-scaled image = its width; int widthstep = ((width*sizeof(unsigned char)*nchannels)%4!=0)?((((width*sizeof(unsigned char)*nchannels)/4)*4) + 4):(width*sizeof(unsigned char)*nchannels);
 
 	// transform the points to the format we need (is also done in the other corner finders
 	*count = (*count > MAX_COUNT) ? MAX_COUNT : *count;
@@ -2290,7 +2297,7 @@ void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int im
 
 	// b)
 	float distance2;
-	float min_distance = 10; //10
+	float min_distance = 10;
 	float min_distance2 = min_distance*min_distance;
 	int new_point;
 
@@ -2299,7 +2306,7 @@ void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int im
 	for(i = 0; i < max_new_points; i++)
 	{
 		new_point = 1;
-
+		//TODO: not all detected_points are examined but only the first "flow_point_size" of detected_points are used currently
 		for(j = 0; j < *flow_point_size; j++)
 		{
 			// distance squared:
@@ -2329,7 +2336,7 @@ void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int im
 	setPointsToFlowPoints(flow_points, detected_points, flow_point_size, count, MAX_COUNT);
 }
 
-void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points0[],struct detectedPoint detected_points1[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status)
+void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status)
 {
 
 	// a) track the points to the new image
@@ -2345,15 +2352,10 @@ void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int i
     {
 			for(i=0; i<*count; i++)
 			{
-				x[i] = detected_points0[i].x;
-				y[i] = detected_points0[i].y;
+				x[i] = detected_points[i].x;
+				y[i] = detected_points[i].y;
 			}
 			error_opticflow = opticFlowLK(frame, prev_frame, x, y, *count, imW, imH, new_x, new_y, status, 5, MAX_COUNT);
-//			for(i=0; i<*count; i++)
-//			{
-//				detected_points1[i].x = new_x[i];
-//				detected_points1[i].y = new_y[i];
-//			}
 	}
 
 	if(error_opticflow == 0)
@@ -2406,84 +2408,11 @@ void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int i
 			flow_points[i].prev_y = flow_points[i].y;
 			flow_points[i].x = flow_points[i].x + flow_points[i].dx;
 			flow_points[i].y = flow_points[i].y + flow_points[i].dy;
-			// save good tracked points for the next frame
-			detected_points1[i].x = flow_points[i].x;
-			detected_points1[i].y = flow_points[i].y;
 		}
 	}
 
 	return;
 }
-unsigned int OF_buf_point = 0;
-unsigned int OF_buf_point2 = 0;
-float tot_x, tot_y, x_avg, y_avg, x_buf[24], y_buf[24], x_buf2[24], y_buf2[24];
-
-void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint flow_points[], int count, int OF_FilterType)
-{
-	tot_x = 0.0;
-	tot_y = 0.0;
-
-	for (int i=0; i<count;i++)
-	{
-		tot_x = tot_x + (float) flow_points[i].dx;
-		tot_y = tot_y + (float) flow_points[i].dy;
-	}
-
-	if(OF_FilterType == 1) //1. moving average 2. moving median
-	{
-
-		x_avg = 0.0;
-		y_avg = 0.0;
-
-		if(count)
-		{
-			x_buf[OF_buf_point] = tot_x/count;
-			y_buf[OF_buf_point] = tot_y/count;
-		}
-		else
-		{
-			x_buf[OF_buf_point] = 0.0;
-			y_buf[OF_buf_point] = 0.0;
-		}
-		OF_buf_point = (OF_buf_point+1) %5;
-
-		for (int i=0;i<5;i++) {
-			x_avg+=x_buf[i]*0.2;
-			y_avg+=y_buf[i]*0.2;
-		}
-
-		*opt_angle_x_raw = x_avg;
-		*opt_angle_y_raw = y_avg;
-
-	}
-	else if(OF_FilterType == 2)
-	{
-		if(count)
-		{
-			x_buf2[OF_buf_point2] = tot_x/count;
-			y_buf2[OF_buf_point2] = tot_y/count;
-		}
-		else
-		{
-			x_buf2[OF_buf_point2] = 0.0;
-			y_buf2[OF_buf_point2] = 0.0;
-		}
-		OF_buf_point2 = (OF_buf_point2+1) %11;
-
-		quick_sort(x_buf2,11);
-		quick_sort(y_buf2,11);
-
-		*opt_angle_x_raw = x_buf2[6];
-		*opt_angle_y_raw = y_buf2[6];
-	}
-	else
-	{
-		printf("no filter type selected!\n");
-	}
-
-
-}
-
 
 void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int *DIV_FILTER)
 {
@@ -2557,6 +2486,8 @@ void lineDivergence(float *divergence, int *x, int *y, int *new_x, int *new_y, i
 	}
 
 }
+<<<<<<< Updated upstream
+=======
 
 void subimage(unsigned char *gray_frame, unsigned char *subframe, int subimH, int subimW, int wInit, int hInit)
 {
@@ -2573,18 +2504,18 @@ void subimage(unsigned char *gray_frame, unsigned char *subframe, int subimH, in
         }
     }
 }
-/*
+
 void findDistributedPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *status)
 {
 	// a) Divide image into 9 regions
 	// b) Run corner detection in these regions
 
-	int nWidth, nHeight, subimH, subimW, wInit, hInit, xcount, next_region, n_accu, n_run;
+	int nWidth, nHeight, subimH, subimW, wInit, hInit, region, n_accu, n_run;
 	nWidth = 3;
 	nHeight = 3;
 	subimH = (imH-imH%nHeight)/nHeight; // a few pixels (imW%nHeight) are ignored!!
 	subimW = (imW-imW%nWidth)/nWidth;
-	wInit = 0; hInit = 0; xcount = 0; next_region = 0; n_accu = 1; n_run = 0;
+	wInit = 0; hInit = 0; region = 0; n_accu = 0; n_run = 0;
 	unsigned char *subframe;
 	subframe = (unsigned char *) calloc(subimH*subimW,sizeof(unsigned char));
 
@@ -2598,7 +2529,7 @@ void findDistributedPoints(unsigned char *gray_frame, unsigned char *frame, int 
 	{
 		for (int j=0; j<nWidth; j++)
 		{
-			if(!status[xcount] || next_region)
+			if(!status[region] || n_accu)
 			{
 				subimage(gray_frame, subframe, subimH, subimW, wInit, hInit);
 				pnts_fast = fast9_detect((const byte*)subframe, subimW, subimH, subimW, fast_threshold, count); //widthstep for gray-scaled image = its width; int widthstep = ((width*sizeof(unsigned char)*nchannels)%4!=0)?((((width*sizeof(unsigned char)*nchannels)/4)*4) + 4):(width*sizeof(unsigned char)*nchannels);
@@ -2606,37 +2537,37 @@ void findDistributedPoints(unsigned char *gray_frame, unsigned char *frame, int 
 				if(*count)
 				{
 					n_run = (n_accu < *count) ? n_accu : n_accu - *count;
-					for(int k=0; k<n_run; k++)
+					for(int k=0; k<=n_run; k++)
 					{
-						flow_points[xcount-k].x = pnts_fast[k].x + wInit;
-						flow_points[xcount-k].y = pnts_fast[k].y + hInit;
-						flow_points[xcount-k].prev_x = pnts_fast[k].x + wInit;
-						flow_points[xcount-k].prev_y = pnts_fast[k].y + hInit;
-						flow_points[xcount-k].dx = 0;
-						flow_points[xcount-k].dy = 0;
-						flow_points[xcount-k].new_dx = 0;
-						flow_points[xcount-k].new_dy = 0;
+						flow_points[region-k].x = pnts_fast[k].x + wInit;
+						flow_points[region-k].y = pnts_fast[k].y + hInit;
+						flow_points[region-k].prev_x = pnts_fast[k].x + wInit;
+						flow_points[region-k].prev_y = pnts_fast[k].y + hInit;
+						flow_points[region-k].dx = 0;
+						flow_points[region-k].dy = 0;
+						flow_points[region-k].new_dx = 0;
+						flow_points[region-k].new_dy = 0;
 					}
 					n_accu -= n_run;
-					next_region = 0;
 				}
 				else
 				{
-					next_region = 1;
 					n_accu++; // accumulate corners to next region
 				}
+
 				free(pnts_fast);
 			}
-			xcount ++;
+			region ++;
 			wInit += subimW;
 		}
 		wInit = 0;
 		hInit += subimH;
 	}
-	*flow_point_size = (xcount + 1) - (n_accu -1);
+	*flow_point_size = (region + 1) - (n_accu);
 	free(subframe);
+	setPointsToFlowPoints(flow_points, detected_points, flow_point_size, count, MAX_COUNT);
 }
-*/
+
 void trackDistributedPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status)
 {
 
@@ -2711,3 +2642,4 @@ void trackDistributedPoints(unsigned char *frame, unsigned char *prev_frame, int
 
 	return;
 }
+>>>>>>> Stashed changes
