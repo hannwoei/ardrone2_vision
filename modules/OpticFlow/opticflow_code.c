@@ -308,6 +308,21 @@ void my_plugin_run(unsigned char *frame)
 
 	stateSetSpeedNed_i(&OF_speed);
 
+	/*
+	 * comment out "stateSetSpeedNed_i(&ins_impl.ltp_speed);" in ins_int.c if optic flow velocities are used to set the speeds in the states
+	 * // copy position and speed to state interface
+		static void ins_ned_to_state(void) {
+		  stateSetPositionNed_i(&ins_impl.ltp_pos);
+		  //stateSetSpeedNed_i(&ins_impl.ltp_speed);
+		  stateSetAccelNed_i(&ins_impl.ltp_accel);
+
+		#if defined SITL && USE_NPS
+		  if (nps_bypass_ins)
+			sim_overwrite_ins();
+		#endif
+}
+	 */
+
     // compute divergence/ TTI
 	int USE_FITTING = 1;
 	if(USE_FITTING == 1)
