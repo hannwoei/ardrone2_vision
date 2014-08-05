@@ -23,10 +23,6 @@
 // Own header
 #include "opticflow_module.h"
 
-// UDP Message with GST vision
-#include "udp/socket.h"
-#include "video_message_structs.h"
-
 // Navigate Based On Vision
 #include "land_guidance.h"
 
@@ -36,11 +32,6 @@
 
 // Threaded computer vision
 #include <pthread.h>
-
-struct UdpSocket *sock;
-struct gst2ppz_message_struct gst2ppz;
-struct ppz2gst_message_struct ppz2gst;
-
 
 // Frame Rate
 #include <sys/time.h>
@@ -71,9 +62,6 @@ long end_timer() {
 
 void opticflow_module_init(void) {
 	opticflow_module_start();
-  // Give unique ID's to messages TODO: check that received messages are correct (not from an incompatable gst plugin)
-  ppz2gst.ID = 0x0003;
-  gst2ppz.ID = 0x0004;
 
   // Navigation Code Initialization
   init_land_guidance();
@@ -90,31 +78,12 @@ volatile uint8_t computervision_thread_has_results = 0;
 
 void opticflow_module_run(void) {
 
-  // Send Attitude To GST Module
-  struct Int32Eulers* att = stateGetNedToBodyEulers_i();
-  ppz2gst.counter++; // 512 Hz
-  ppz2gst.roll = att->phi;
-  ppz2gst.pitch = att->theta;
-//  ppz2gst.alt = navdata_height();
-
   // Read Latest Vision Module Results
   if (computervision_thread_has_results)
   {
     computervision_thread_has_results = 0;
     run_land_guidance_onvision();
   }
-
-/*
-  else
-  {
-    // Play annimation
-    static uint8_t nr = 0;
-    gst2ppz.obstacle_bins[nr] ++;
-    nr ++;
-    if (nr >= N_BINS)
-      nr = 0;
-  }
-  */
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -160,7 +129,7 @@ void *computervision_thread_main(void* data)
   struct img_struct* img_new = video_create_image(&vid);
 
   // Video Resizing
-  #define DOWNSIZE_FACTOR 1
+  #define DOWNSIZE_FACTOR 4
   struct img_struct small;
   small.w = vid.w / DOWNSIZE_FACTOR;
   small.h = vid.h / DOWNSIZE_FACTOR;
@@ -180,8 +149,8 @@ void *computervision_thread_main(void* data)
 #endif
 
   // First Apply Settings before init
-  imgWidth = vid.w;
-  imgHeight = vid.h;
+  imgWidth = small.w;
+  imgHeight = small.h;
   verbose = 2;
   my_plugin_init();
 
@@ -195,12 +164,12 @@ void *computervision_thread_main(void* data)
 //	printf("dt = %d, FPS = %f\n",timestamp, FPS);
 	start_timer();
 
-    // Process
-    my_plugin_run(img_new->buf);
-
     // Resize: device by 4
     resize_uyuv(img_new, &small, DOWNSIZE_FACTOR);
 
+    // Process
+//    my_plugin_run(img_new->buf);
+	my_plugin_run(small.buf);
 
 #ifdef DOWNLINK_VIDEO
     // JPEG encode the image:
