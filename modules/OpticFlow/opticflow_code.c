@@ -306,7 +306,7 @@ void my_plugin_run(unsigned char *frame)
 	OF_speed.x = (int) (Velx*(1<<(INT32_SPEED_FRAC)));
 	OF_speed.y = (int) (Vely*(1<<(INT32_SPEED_FRAC)));
 
-	stateSetSpeedNed_i(&OF_speed);
+	//stateSetSpeedNed_i(&OF_speed);
 
 	/*
 	 * comment out "stateSetSpeedNed_i(&ins_impl.ltp_speed);" in ins_int.c if optic flow velocities are used to set the speeds in the states

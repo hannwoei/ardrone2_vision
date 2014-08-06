@@ -2022,22 +2022,22 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		if(abs(*divergence) > minimal_divergence)
 		{
 			*mean_tti = 2.0f / *divergence;
-//			if(FPS > 1E-3) *mean_tti /= FPS;
-//			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
-			if(FPS > 1E-3) *mean_tti /= 60;
-			else *mean_tti = ((2.0f / minimal_divergence) / 60);
+			if(FPS > 1E-3) *mean_tti /= FPS;
+			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
+//			if(FPS > 1E-3) *mean_tti /= 60;
+//			else *mean_tti = ((2.0f / minimal_divergence) / 60);
 			*median_tti = *mean_tti;
 		}
 		else
 		{
-//			*mean_tti = ((2.0f / minimal_divergence) / FPS);
-			*mean_tti = ((2.0f / minimal_divergence) / 60);
+			*mean_tti = ((2.0f / minimal_divergence) / FPS);
+//			*mean_tti = ((2.0f / minimal_divergence) / 60);
 			*median_tti = *mean_tti;
 		}
 
 		// also adjust the divergence to the number of frames:
-//		*divergence = *divergence * FPS;
-		*divergence = *divergence * 60;
+		*divergence = *divergence * FPS;
+//		*divergence = *divergence * 60;
 
 		// translation orthogonal to the camera axis:
 		// flow in the center of the image:
@@ -2070,12 +2070,12 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		{
 			*DIV_FILTER = 2;
 			//apply a median filter
-			if (*divergence < 3.0 && *divergence > -3.0) {
+//			if (*divergence < 3.0 && *divergence > -3.0) {
 				div_buf[div_point] = *divergence;
-				div_point = (div_point+1) %mov_block;
-			}
-			quick_sort(div_buf,mov_block);
-			*divergence  = div_buf[mov_block/2];
+				div_point = (div_point+1) %11;
+//			}
+			quick_sort(div_buf,11);
+			*divergence  = div_buf[6];
 		}
 		else if(butterworthfilter == 1)
 		{
