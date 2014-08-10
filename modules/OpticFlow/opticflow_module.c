@@ -129,7 +129,7 @@ void *computervision_thread_main(void* data)
   struct img_struct* img_new = video_create_image(&vid);
 
   // Video Resizing
-  #define DOWNSIZE_FACTOR 4
+  #define DOWNSIZE_FACTOR 1
   struct img_struct small;
   small.w = vid.w / DOWNSIZE_FACTOR;
   small.h = vid.h / DOWNSIZE_FACTOR;

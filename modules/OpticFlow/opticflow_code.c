@@ -18,6 +18,7 @@
 #include "math/pprz_algebra_int.h"
 #include "math/pprz_algebra_float.h"
 #include "subsystems/imu.h"
+#include "firmwares/rotorcraft/stabilization.h"
 
 // Downlink
 #include "messages.h"
@@ -90,7 +91,8 @@ struct FloatVect3 accel_update;
 struct FloatRates rate_update;
 
 // Flow fitting
-float mean_tti, median_tti, d_heading, d_pitch, pu[3], pv[3], divergence_error;
+float mean_tti, median_tti, d_heading, d_pitch, divergence_error;
+float z_x, z_y, three_dimensionality, POE_x, POE_y;
 
 // tryout
 struct NedCoor_i OF_speed;
@@ -139,8 +141,11 @@ void my_plugin_init(void)
 	d_heading = 0.0;
 	d_pitch = 0.0;
 	divergence_error = 0.0;
-	pu[0] = 0.0; pu[1] = 0.0; pu[2] = 0.0;
-	pv[0] = 0.0; pv[1] = 0.0; pv[2] = 0.0;
+	z_x = 0.0;
+	z_y = 0.0;
+	three_dimensionality = 0.0;
+	POE_x = 0.0;
+	POE_y = 0.0;
 
 	opt_angle_x_raw = 0;
 	opt_angle_y_raw = 0;
@@ -327,7 +332,7 @@ void my_plugin_run(unsigned char *frame)
 	int USE_FITTING = 1;
 	if(USE_FITTING == 1)
 	{
-		analyseTTI(&divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
+		analyseTTI(&z_x, &z_y, &three_dimensionality, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
 	}
 
 	// new method for computing divergence
@@ -350,7 +355,7 @@ void my_plugin_run(unsigned char *frame)
 		detected_points1[i] = swap_points[i];
 	}
 
-	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &OF_speed.x, &OF_speed.y, &stateGetSpeedNed_i()->x, &stateGetSpeedNed_i()->y, &diff_roll, &diff_pitch, &cam_h_med, &count, &flow_point_size, &divergence, &new_divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &pu[2], &pv[2], &divergence_error, n_inlier_minu, n_inlier_minv, &DIV_FILTER);
+	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velx, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &new_divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &z_x, &z_y, &divergence_error, n_inlier_minu, n_inlier_minv, &stabilization_cmd[COMMAND_THRUST]);
 
 }
 

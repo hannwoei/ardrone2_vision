@@ -1999,7 +1999,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 //printf("stop8\n");
 }
 
-unsigned int mov_block = 30; //default: 30
+unsigned int mov_block = 15; //default: 30
 float div_buf[30];
 unsigned int div_point = 0;
 float OFS_BUTTER_NUM_1 = 0.0004260;
@@ -2092,66 +2092,69 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 			*DIV_FILTER = 4;
 		}
 
-/*
-		// TODO: input/output paramters
-		//float min_error_u, min_error_v,  v_prop_x, v_prop_y, z_x, z_y, three_dimensionality, POE_x, POE_y;
-		// extract proportional velocities / inclination from flow field:
-		v_prop_x  = d_heading;
-		v_prop_y = d_pitch;
-		float threshold_slope = 1.0;
-		float eta = 0.002;
-		if(abs(pv[1]) < eta && abs(v_prop_y) < threshold_slope && abs(v_prop_x) >= 2* threshold_slope)
-		{
-			// there is not enough vertical motion, but also no forward motion:
-			z_x = pu[0] / v_prop_x;
-		}
-		else if(abs(v_prop_y) >= 2 * threshold_slope)
-		{
-			// there is sufficient vertical motion:
-			z_x = pv[0] / v_prop_y;
-		}
-		else
-		{
-			// there may be forward motion, then we can do a quadratic fit:
-			z_x = 0.0f;
-		}
 
-		three_dimensionality = min_error_v + min_error_u;
+}
 
-		if(abs(pu[0]) < eta && abs(v_prop_x) < threshold_slope && abs(v_prop_y) >= 2*threshold_slope)
-		{
-			// there is little horizontal movement, but also no forward motion, and sufficient vertical motion:
-			z_y = pv[1] / v_prop_y;
-        }
-		else if(abs(v_prop_x) >= 2*threshold_slope)
-		{
-			// there is sufficient horizontal motion:
-			z_y = pu[1] / v_prop_x;
-		}
-		else
-		{
-			// there could be forward motion, then we can do a quadratic fit:
-			z_y = 0.0f;
-		}
+void slopeEstimation(float *z_x, float *z_y, float *three_dimensionality, float *POE_x, float *POE_y, float d_heading, float d_pitch, float* pu, float* pv, float min_error_u, float min_error_v)
+{
+	float v_prop_x, v_prop_y, threshold_slope, eta;
 
-		// Focus of Expansion:
-		// the flow planes intersect the flow=0 plane in a line
-		// the FoE is the point where these 2 lines intersect (flow = (0,0))
-		// x:
-		float denominator = pv[0]*pu[1] - pu[0]*pv[1];
-		if(abs(denominator) > 1E-5)
-		{
-			POE_x = (float)((pu[2]*pv[1] - pv[2] * pu[1]) / denominator);
-		}
-		else POE_x = 0.0f;
-		// y:
-		denominator = pu[1];
-		if(abs(denominator) > 1E-5)
-		{
-			POE_y = (float)(-(pu[0] * POE_x + pu[2]) / denominator);
-		}
-		else POE_y = 0;
-*/
+	// extract proportional velocities / inclination from flow field:
+	v_prop_x  = d_heading;
+	v_prop_y = d_pitch;
+	threshold_slope = 1.0;
+	eta = 0.002;
+	if(abs(pv[1]) < eta && abs(v_prop_y) < threshold_slope && abs(v_prop_x) >= 2* threshold_slope)
+	{
+		// there is not enough vertical motion, but also no forward motion:
+		*z_x = pu[0] / v_prop_x;
+	}
+	else if(abs(v_prop_y) >= 2 * threshold_slope)
+	{
+		// there is sufficient vertical motion:
+		*z_x = pv[0] / v_prop_y;
+	}
+	else
+	{
+		// there may be forward motion, then we can do a quadratic fit:
+		*z_x = 0.0f;
+	}
+
+	*three_dimensionality = min_error_v + min_error_u;
+
+	if(abs(pu[0]) < eta && abs(v_prop_x) < threshold_slope && abs(v_prop_y) >= 2*threshold_slope)
+	{
+		// there is little horizontal movement, but also no forward motion, and sufficient vertical motion:
+		*z_y = pv[1] / v_prop_y;
+	}
+	else if(abs(v_prop_x) >= 2*threshold_slope)
+	{
+		// there is sufficient horizontal motion:
+		*z_y = pu[1] / v_prop_x;
+	}
+	else
+	{
+		// there could be forward motion, then we can do a quadratic fit:
+		*z_y = 0.0f;
+	}
+
+	// Focus of Expansion:
+	// the flow planes intersect the flow=0 plane in a line
+	// the FoE is the point where these 2 lines intersect (flow = (0,0))
+	// x:
+	float denominator = pv[0]*pu[1] - pu[0]*pv[1];
+	if(abs(denominator) > 1E-5)
+	{
+		*POE_x = ((pu[2]*pv[1] - pv[2] * pu[1]) / denominator);
+	}
+	else *POE_x = 0.0f;
+	// y:
+	denominator = pu[1];
+	if(abs(denominator) > 1E-5)
+	{
+		*POE_y = (-(pu[0] * *POE_x + pu[2]) / denominator);
+	}
+	else *POE_y = 0.0f;
 }
 
 void quick_sort (float *a, int n) {
@@ -2485,7 +2488,7 @@ void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint f
 }
 
 
-void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int *DIV_FILTER)
+void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_x, float *POE_y, float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int *DIV_FILTER)
 {
 		// linear fit of the optic flow field
 		float error_threshold = 10; // 10
@@ -2510,6 +2513,8 @@ void analyseTTI(float *divergence, float *mean_tti, float *median_tti, float *d_
 		fitLinearFlowField(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
 		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, DIV_FILTER);
+
+		slopeEstimation(z_x, z_y, three_dimensionality, POE_x, POE_y, *d_heading, *d_pitch, pu, pv, min_error_u, min_error_v);
 
 //		printf("0:%d\n1:%f\n",count,divergence[0]);
 }
