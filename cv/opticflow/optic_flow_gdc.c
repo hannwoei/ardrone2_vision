@@ -2022,22 +2022,22 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		if(abs(*divergence) > minimal_divergence)
 		{
 			*mean_tti = 2.0f / *divergence;
-			if(FPS > 1E-3) *mean_tti /= FPS;
-			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
-//			if(FPS > 1E-3) *mean_tti /= 60;
-//			else *mean_tti = ((2.0f / minimal_divergence) / 60);
+//			if(FPS > 1E-3) *mean_tti /= FPS;
+//			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
+			if(FPS > 1E-3) *mean_tti /= 60;
+			else *mean_tti = ((2.0f / minimal_divergence) / 60);
 			*median_tti = *mean_tti;
 		}
 		else
 		{
-			*mean_tti = ((2.0f / minimal_divergence) / FPS);
-//			*mean_tti = ((2.0f / minimal_divergence) / 60);
+//			*mean_tti = ((2.0f / minimal_divergence) / FPS);
+			*mean_tti = ((2.0f / minimal_divergence) / 60);
 			*median_tti = *mean_tti;
 		}
 
 		// also adjust the divergence to the number of frames:
-		*divergence = *divergence * FPS;
-//		*divergence = *divergence * 60;
+//		*divergence = *divergence * FPS;
+		*divergence = *divergence * 60;
 
 		// translation orthogonal to the camera axis:
 		// flow in the center of the image:
