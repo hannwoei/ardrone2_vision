@@ -2022,22 +2022,22 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		if(abs(*divergence) > minimal_divergence)
 		{
 			*mean_tti = 2.0f / *divergence;
-//			if(FPS > 1E-3) *mean_tti /= FPS;
-//			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
-			if(FPS > 1E-3) *mean_tti /= 60;
-			else *mean_tti = ((2.0f / minimal_divergence) / 60);
+			if(FPS > 1E-3) *mean_tti /= FPS;
+			else *mean_tti = ((2.0f / minimal_divergence) / FPS);
+//			if(FPS > 1E-3) *mean_tti /= 60;
+//			else *mean_tti = ((2.0f / minimal_divergence) / 60);
 			*median_tti = *mean_tti;
 		}
 		else
 		{
-//			*mean_tti = ((2.0f / minimal_divergence) / FPS);
-			*mean_tti = ((2.0f / minimal_divergence) / 60);
+			*mean_tti = ((2.0f / minimal_divergence) / FPS);
+//			*mean_tti = ((2.0f / minimal_divergence) / 60);
 			*median_tti = *mean_tti;
 		}
 
 		// also adjust the divergence to the number of frames:
-//		*divergence = *divergence * FPS;
-		*divergence = *divergence * 60;
+		*divergence = *divergence * FPS;
+//		*divergence = *divergence * 60;
 
 		// translation orthogonal to the camera axis:
 		// flow in the center of the image:
@@ -2045,8 +2045,8 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		*d_pitch = (-(pv[2] + (imgWidth/2.0f) * pv[0] + (imgHeight/2.0f) * pv[1]));
 
 		//apply a moving average
-		int medianfilter = 0;
-		int averagefilter = 1;
+		int medianfilter = 1;
+		int averagefilter = 0;
 		int butterworthfilter = 0;
 		int kalmanfilter = 0;
 		float div_avg = 0.0f;
@@ -2064,18 +2064,17 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 				div_avg+=div_buf[im];
 			}
 			*divergence = div_avg/ mov_block;
-//			*divergence = div_avg;
 		}
 		else if(medianfilter == 1)
 		{
 			*DIV_FILTER = 2;
 			//apply a median filter
-//			if (*divergence < 3.0 && *divergence > -3.0) {
+			if (*divergence < 3.0 && *divergence > -3.0) {
 				div_buf[div_point] = *divergence;
-				div_point = (div_point+1) %11;
-//			}
-			quick_sort(div_buf,11);
-			*divergence  = div_buf[6];
+				div_point = (div_point+1) %15;
+			}
+			quick_sort(div_buf,15);
+			*divergence  = div_buf[8];
 		}
 		else if(butterworthfilter == 1)
 		{
@@ -2492,7 +2491,7 @@ void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_
 {
 		// linear fit of the optic flow field
 		float error_threshold = 10; // 10
-		int n_iterations = 20; // 40
+		int n_iterations = 20; // 20
 
 		int n_samples = (count < 5) ? count : 5;
 

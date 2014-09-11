@@ -19,6 +19,7 @@
 #include "math/pprz_algebra_float.h"
 #include "subsystems/imu.h"
 #include "firmwares/rotorcraft/stabilization.h"
+#include "subsystems/gps.h"
 
 // Downlink
 #include "messages.h"
@@ -92,10 +93,20 @@ struct FloatRates rate_update;
 
 // Flow fitting
 float mean_tti, median_tti, d_heading, d_pitch, divergence_error;
-float z_x, z_y, three_dimensionality, POE_x, POE_y;
+float z_x, z_y, three_dimensionality, POE_x, POE_y, threshold_3D_low, threshold_3D_high, land_safe, land_safe_false, div_buf_3D[30], div_avg_3D;
+unsigned int mov_block_3D, div_point_3D;
 
 // tryout
 struct NedCoor_i OF_speed;
+
+// waypoint
+#include "navigation.h"
+#include "generated/flight_plan.h"
+#define win_3D 300
+struct EnuCoor_i waypoints_3D[win_3D];
+struct EnuCoor_i waypoints_3D_min;
+float buf_3D[win_3D], avg_3D, min_3D;
+unsigned int buf_point_3D, init3D, stay_waypoint_3D, land_safe_count, max_safe;
 
 // Called by plugin
 void my_plugin_init(void)
@@ -146,6 +157,13 @@ void my_plugin_init(void)
 	three_dimensionality = 0.0;
 	POE_x = 0.0;
 	POE_y = 0.0;
+	threshold_3D_low = 0.0;
+	threshold_3D_high = 0.0;
+	land_safe = 0.0;
+	land_safe_false = 0.0;
+	mov_block_3D = 6;
+	div_point_3D = 0;
+	div_avg_3D = 0.0;
 
 	opt_angle_x_raw = 0;
 	opt_angle_y_raw = 0;
@@ -171,6 +189,14 @@ void my_plugin_init(void)
 	OF_speed.x = 0;
 	OF_speed.y = 0;
 	OF_speed.z = 0;
+
+	//waypoints
+	avg_3D = 0.0;;
+	buf_point_3D = 0;
+	init3D = 0;
+	stay_waypoint_3D = 0;
+	land_safe_count = 0;
+	max_safe = 0;
 }
 
 void my_plugin_run(unsigned char *frame)
@@ -216,7 +242,7 @@ void my_plugin_run(unsigned char *frame)
     }
     else
     {
-    	int threshold_n_points = 15; //25
+    	int threshold_n_points = 25; //25
     	if(flow_point_size < threshold_n_points)
     	{
         	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
@@ -240,10 +266,14 @@ void my_plugin_run(unsigned char *frame)
 //    	OFfilter(&opt_angle_x_raw, &opt_angle_y_raw, flow_points, count, 1);
     	OFfilter(&opt_angle_x_raw, &opt_angle_y_raw, flow_points, count, 2);
 
+		curr_pitch = stateGetNedToBodyEulers_i()->theta*0.0139882;
+		curr_roll = stateGetNedToBodyEulers_i()->phi*0.0139882;
+		diff_pitch = (curr_pitch - prev_pitch);
+		diff_roll = (curr_roll - prev_roll);
+		prev_pitch = curr_pitch;
+		prev_roll = curr_roll;
 		/*
 		// Flow Derotation
-
-
 	//		curr_pitch = stateGetNedToBodyEulers_i()->theta*0.0139882;
 	//		curr_roll = stateGetNedToBodyEulers_i()->phi*0.0139882;
 	//		curr_yaw = stateGetNedToBodyEulers_i()->psi*0.0139882;
@@ -330,13 +360,134 @@ void my_plugin_run(unsigned char *frame)
 
     // compute divergence/ TTI
 	int USE_FITTING = 1;
+	int USE_MEAN_3D = 0;
+	int USE_MEDIAN_3D = 1;
+	threshold_3D_low = 450.0;
+	threshold_3D_high = 1000.0;
+
 	if(USE_FITTING == 1)
 	{
 		analyseTTI(&z_x, &z_y, &three_dimensionality, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
+		if(count>3)
+		{
+			if (USE_MEAN_3D == 1)
+			{
+
+				div_buf_3D[div_point_3D] = three_dimensionality;
+				div_point_3D = (div_point_3D+1) %mov_block_3D; // index starts from 0 to mov_block
+				div_avg_3D = 0.0;
+				for (int im=0;im<mov_block_3D;im++) {
+					div_avg_3D+=div_buf_3D[im];
+				}
+				three_dimensionality = (float) div_avg_3D/ mov_block_3D;
+			}
+			else if(USE_MEDIAN_3D == 1)
+			{
+				div_buf_3D[div_point_3D] = three_dimensionality;
+				div_point_3D = (div_point_3D+1) %mov_block_3D;
+				quick_sort(div_buf_3D,mov_block_3D);
+				three_dimensionality = div_buf_3D[mov_block_3D/2];
+			}
+			else
+			{
+
+			}
+			if ((three_dimensionality < threshold_3D_low))
+			{
+				land_safe = 1.0;
+			}
+			else
+			{
+				land_safe = 0.0;
+			}
+			if (three_dimensionality > threshold_3D_high)
+			{
+				land_safe_false = 1.0;
+			}
+			else
+			{
+				land_safe_false = 0.0;
+			}
+		}
+		else
+		{
+			land_safe = 0.0;
+			land_safe_false = 0.0;
+		}
 	}
 
-	// new method for computing divergence
-	// lineDivergence(&new_divergence, x, y, new_x, new_y, count);
+
+	//set the first initial 3D/ pre-defined 3D as minimum 3D
+	//if((autopilot_in_flight == 1) && (stateGetPositionEnu_i()->z > POS_BFP_OF_REAL(3)) && ((abs(stateGetSpeedEnu_i()->x) > SPEED_BFP_OF_REAL(0.3)) || (abs(stateGetSpeedEnu_i()->y) > SPEED_BFP_OF_REAL(0.3)))) // new waypoints are created only when it is in flight with height > 3m
+
+//	if(((abs(stateGetSpeedEnu_i()->x) > SPEED_BFP_OF_REAL(0.3)) || (abs(stateGetSpeedEnu_i()->y) > SPEED_BFP_OF_REAL(0.3)))) // new waypoints are created only when it is in flight with height > 3m
+//	{
+////		NavCopyWaypoint(WP_safe,WP_p7);
+////		land_safe = 1.0;
+//
+//		waypoints_3D[buf_point_3D].x = stateGetPositionEnu_i()->x;
+//		waypoints_3D[buf_point_3D].y = stateGetPositionEnu_i()->y;
+//		waypoints_3D[buf_point_3D].z = stateGetPositionEnu_i()->z; // SONAR problem: when USE_SONAR is activated, the fusion result gives wrong height estimate
+//		buf_3D[buf_point_3D] = three_dimensionality;
+//		buf_point_3D = (buf_point_3D+1) %win_3D; // index starts from 0 to mov_block
+//
+//		for (int im=0;im<win_3D;im++) {
+//			avg_3D+=buf_3D[im];
+//		}
+//		avg_3D = avg_3D/ win_3D;
+//
+//		if (init3D == 0)
+//		{
+//			// min_3D = avg_3D;
+//			min_3D = 100.0;
+//			init3D = 1;
+//		}
+//
+//		if(avg_3D < min_3D)
+//		{
+//			min_3D = avg_3D;
+//			nav_move_waypoint(WP_safe, &waypoints_3D[6]); // save the waypoint having the minimum 3D value
+//		}
+//	}
+//	else
+//	{
+////		land_safe = 0.0;
+////		NavCopyWaypoint(WP_safe,WP_p2);
+//	}
+
+	if((!stay_waypoint_3D) && ((abs(stateGetSpeedEnu_i()->x) > SPEED_BFP_OF_REAL(0.3)) || (abs(stateGetSpeedEnu_i()->y) > SPEED_BFP_OF_REAL(0.3)))) // new waypoints are created only when it is in flight with height > 3m
+	{
+		if(land_safe == 1)
+		{
+			waypoints_3D[buf_point_3D].x = stateGetPositionEnu_i()->x;
+			waypoints_3D[buf_point_3D].y = stateGetPositionEnu_i()->y;
+			waypoints_3D[buf_point_3D].z = stateGetPositionEnu_i()->z; // SONAR problem?: when USE_SONAR is activated, the fusion result gives wrong height estimate
+			buf_point_3D = (buf_point_3D+1) %win_3D; // index starts from 0 to mov_block
+
+			land_safe_count ++;
+		}
+		else
+		{
+			if(land_safe_count > max_safe) //land with the largest possibility of safe region
+			{
+				max_safe = land_safe_count;
+				nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
+			}
+			land_safe_count = 0;
+			buf_point_3D = 0;
+		}
+	}
+	else
+	{
+		if(land_safe_count > max_safe)
+		{
+			max_safe = land_safe_count;
+			nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
+		}
+		land_safe_count = 0;
+		buf_point_3D = 0;
+	}
+
 
 
 	// *********************************************
@@ -355,7 +506,9 @@ void my_plugin_run(unsigned char *frame)
 		detected_points1[i] = swap_points[i];
 	}
 
-	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velx, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &new_divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &z_x, &z_y, &divergence_error, n_inlier_minu, n_inlier_minv, &stabilization_cmd[COMMAND_THRUST]);
+//	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &stabilization_cmd[COMMAND_THRUST], &three_dimensionality);
+//	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &stay_waypoint_3D, &three_dimensionality);
+	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetSpeedEnu_i()->x, &stateGetSpeedEnu_i()->y, &stateGetSpeedEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &max_safe, &three_dimensionality);
 
 }
 

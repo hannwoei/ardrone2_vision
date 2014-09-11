@@ -17,6 +17,8 @@ extern float opt_angle_y_raw;
 
 extern float divergence;
 
+extern unsigned int stay_waypoint_3D;
+
 // Called by plugin
 void my_plugin_init(void);
 void my_plugin_run(unsigned char *frame);
