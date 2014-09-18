@@ -106,7 +106,7 @@ struct NedCoor_i OF_speed;
 struct EnuCoor_i waypoints_3D[win_3D];
 struct EnuCoor_i waypoints_3D_min;
 float buf_3D[win_3D], avg_3D, min_3D;
-unsigned int buf_point_3D, init3D, stay_waypoint_3D, land_safe_count, max_safe;
+unsigned int buf_point_3D, init3D, stay_waypoint_3D, land_safe_count, max_safe, active_3D;
 
 // Called by plugin
 void my_plugin_init(void)
@@ -191,12 +191,13 @@ void my_plugin_init(void)
 	OF_speed.z = 0;
 
 	//waypoints
-	avg_3D = 0.0;;
+	avg_3D = 0.0;
 	buf_point_3D = 0;
 	init3D = 0;
 	stay_waypoint_3D = 0;
 	land_safe_count = 0;
 	max_safe = 0;
+	active_3D = 0;
 }
 
 void my_plugin_run(unsigned char *frame)
@@ -335,11 +336,11 @@ void my_plugin_run(unsigned char *frame)
 */
 	// Velocity Computation
 
-	Velx = opt_angle_y_raw*cam_h_med/Fy_ARdrone*FPS;
-	Vely = -opt_angle_x_raw*cam_h_med/Fx_ARdrone*FPS;
-
-	OF_speed.x = (int) (Velx*(1<<(INT32_SPEED_FRAC)));
-	OF_speed.y = (int) (Vely*(1<<(INT32_SPEED_FRAC)));
+//	Velx = opt_angle_y_raw*cam_h_med/Fy_ARdrone*FPS;
+//	Vely = -opt_angle_x_raw*cam_h_med/Fx_ARdrone*FPS;
+//
+//	OF_speed.x = (int) (Velx*(1<<(INT32_SPEED_FRAC)));
+//	OF_speed.y = (int) (Vely*(1<<(INT32_SPEED_FRAC)));
 
 	//stateSetSpeedNed_i(&OF_speed);
 
@@ -457,6 +458,7 @@ void my_plugin_run(unsigned char *frame)
 
 	if((!stay_waypoint_3D) && ((abs(stateGetSpeedEnu_i()->x) > SPEED_BFP_OF_REAL(0.3)) || (abs(stateGetSpeedEnu_i()->y) > SPEED_BFP_OF_REAL(0.3)))) // new waypoints are created only when it is in flight with height > 3m
 	{
+		active_3D = 1;
 		if(land_safe == 1)
 		{
 			waypoints_3D[buf_point_3D].x = stateGetPositionEnu_i()->x;
@@ -471,7 +473,7 @@ void my_plugin_run(unsigned char *frame)
 			if(land_safe_count > max_safe) //land with the largest possibility of safe region
 			{
 				max_safe = land_safe_count;
-				nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
+				if (buf_point_3D > 2) nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
 			}
 			land_safe_count = 0;
 			buf_point_3D = 0;
@@ -479,10 +481,11 @@ void my_plugin_run(unsigned char *frame)
 	}
 	else
 	{
+		active_3D = 0;
 		if(land_safe_count > max_safe)
 		{
 			max_safe = land_safe_count;
-			nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
+			if (buf_point_3D > 2) nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
 		}
 		land_safe_count = 0;
 		buf_point_3D = 0;
@@ -508,7 +511,8 @@ void my_plugin_run(unsigned char *frame)
 
 //	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &stabilization_cmd[COMMAND_THRUST], &three_dimensionality);
 //	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &stay_waypoint_3D, &three_dimensionality);
-	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetSpeedEnu_i()->x, &stateGetSpeedEnu_i()->y, &stateGetSpeedEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &max_safe, &three_dimensionality);
+//	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetSpeedEnu_i()->x, &stateGetSpeedEnu_i()->y, &stateGetSpeedEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &max_safe, &three_dimensionality);
+	DOWNLINK_SEND_LAND_SAFE(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,&stateGetSpeedEnu_i()->x, &stateGetSpeedEnu_i()->y, &stateGetSpeedEnu_i()->z, &ins_impl.ltp_pos.z, &diff_roll, &diff_pitch, &count, &divergence, &land_safe, &d_heading, &d_pitch, &z_x, &z_y, n_inlier_minu, n_inlier_minv, &max_safe, &active_3D, &three_dimensionality);
 
 }
 
