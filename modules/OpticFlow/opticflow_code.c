@@ -113,8 +113,21 @@ unsigned int buf_point_3D, init3D, stay_waypoint_3D, land_safe_count, max_safe, 
 float **** dictionary;
 int n_words, patch_size, n_samples, learned_samples, n_samples_image, filled;
 float alpha;
-int WORDS;
+int WORDS, skipped_frame;
 int save_dictionary;
+bool_t train_dictionary;
+bool_t extract_distribution;
+
+int RANDOM_SAMPLES;
+float *word_distribution;
+
+#ifndef VISION_TRAIN_DICTIONARY
+#define VISION_TRAIN_DICTIONARY FALSE
+#endif
+
+#ifndef VISION_EXTRACT_DISTRIBUTION
+#define VISION_EXTRACT_DISTRIBUTION FALSE
+#endif
 
 // Called by plugin
 void my_plugin_init(void)
@@ -210,15 +223,21 @@ void my_plugin_init(void)
 
 	// appearance
 
-	n_words = 5;
+	n_words = 30;
 	patch_size = 6;
-	n_samples = 1000;
+	n_samples = 200000;
 	learned_samples = 0;
-	n_samples_image = 50;
+	n_samples_image = 100;
 	filled = 0;
 	alpha = 0.5;
 	WORDS = 0; // 0: train a dictionary
+	skipped_frame = 0; // 0:skip frame
+	train_dictionary = VISION_TRAIN_DICTIONARY; // initialize false
+	extract_distribution = VISION_EXTRACT_DISTRIBUTION;
 	save_dictionary = 1;
+	word_distribution = (float*)calloc(n_words,sizeof(float));
+	RANDOM_SAMPLES = 1;
+
 	// create a dictionary
 	dictionary = (float ****)calloc(n_words,sizeof(float***));
 
@@ -236,6 +255,9 @@ void my_plugin_init(void)
 			}
 		}
 	}
+
+
+
 }
 
 void my_plugin_run(unsigned char *frame)
@@ -540,48 +562,96 @@ void my_plugin_run(unsigned char *frame)
 	// *********************************************
 
 
-	if(!WORDS)
+//	if(!WORDS && skipped_frame)
+	if(!WORDS && train_dictionary)
 	{
 		DictionaryTrainingYUV(dictionary, frame, n_words, patch_size, &learned_samples, n_samples_image, alpha, imgWidth, imgHeight, &filled);
-		printf("number of samples learnt = %d\n",learned_samples);
+//		printf("number of samples learnt = %d\n",learned_samples);
 	}
 
-	if(learned_samples >= n_samples)
+//	skipped_frame = 1;
+
+	if(extract_distribution && !WORDS)
 	{
-		printf("Done !!!\n");
+		//load a dictionary
+		FILE *fdl;
+		fdl=fopen("/data/video/VisualWords2.dat", "r");
+
+		if(fdl == NULL)
+		{
+			perror("Error while opening the file.\n");
+		}
+		else
+		{
+			for(int i = 0; i < n_words; i++)
+			{
+				for(int j = 0; j < patch_size;j++)
+				{
+					for(int k = 0; k < patch_size; k++)
+					{
+						if(fscanf(fdl, "%f\n", &dictionary[i][j][k][0]) == EOF) break;
+						if(fscanf(fdl, "%f\n", &dictionary[i][j][k][1]) == EOF) break;
+					}
+				}
+			}
+			fclose(fdl);
+			WORDS = 1;
+		}
+	}
+
+	if(learned_samples >= n_samples && !WORDS)
+	{
+//		printf("Done !!!\n");
 		WORDS = 1;
 		// lower learning rate
 		alpha = 0.0;
 
 		if(save_dictionary)
 		{
-			printf("save dictionary\n");
+//			printf("save dictionary\n");
 			//save a dictionary
-			FILE *fd;
-			fd=fopen("./data/video/VisualWords.dat", "w");
-			fprintf(fd,"nothing\n");
-			// delete dictionary
-//			for(int i = 0; i < n_words; i++)
-//			{
-//				for(int j = 0; j < patch_size;j++)
-//				{
-//					for(int k = 0; k < patch_size; k++)
-//					{
-//						printf("0\n");
-////						fprintf(fdi, "%f\n",dictionary[i][j][k][0]);
-////						fprintf(fdi, "%f\n",dictionary[i][j][k][1]);
-////						free(dictionary[i][j][k]);
-//					}
-////					free(dictionary[i][j]);
-//				}
-////				free(dictionary[i]);
-//			}
-//			free(dictionary);
-			fclose(fd);
+			FILE *fdd;
+			fdd=fopen("/data/video/VisualWords3.dat", "w");
+
+			if(fdd == NULL)
+			{
+				perror("Error while opening the file.\n");
+			}
+			else
+			{
+				// delete dictionary
+				for(int i = 0; i < n_words; i++)
+				{
+					for(int j = 0; j < patch_size;j++)
+					{
+						for(int k = 0; k < patch_size; k++)
+						{
+							fprintf(fdd, "%f\n",dictionary[i][j][k][0]);
+							fprintf(fdd, "%f\n",dictionary[i][j][k][1]);
+	//						free(dictionary[i][j][k]);
+						}
+	//					free(dictionary[i][j]);
+					}
+	//				free(dictionary[i]);
+				}
+	//			free(dictionary);
+				fclose(fdd);
+			}
 			save_dictionary = 0;
 		}
 	}
-	printf("0\n");
+
+	if(extract_distribution)
+	{
+		DistributionExtraction(dictionary, frame, word_distribution, n_words, patch_size, n_samples_image, RANDOM_SAMPLES, imgWidth, imgHeight);
+
+		DOWNLINK_SEND_Distribution(DefaultChannel, DefaultDevice, &three_dimensionality, &word_distribution[0], &word_distribution[1], &word_distribution[2], &word_distribution[3], &word_distribution[4]
+		                                                                               , &word_distribution[5], &word_distribution[6], &word_distribution[7], &word_distribution[8], &word_distribution[9]
+		                                                                               , &word_distribution[10], &word_distribution[11], &word_distribution[12], &word_distribution[13], &word_distribution[14]
+		                                                                               , &word_distribution[15], &word_distribution[16], &word_distribution[17], &word_distribution[18], &word_distribution[19]
+		                                                                               , &word_distribution[20], &word_distribution[21], &word_distribution[22], &word_distribution[23], &word_distribution[24]
+		                                                                               , &word_distribution[25], &word_distribution[26], &word_distribution[27], &word_distribution[28], &word_distribution[29]);
+	}
 
 
 	// *********************************************

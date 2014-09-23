@@ -19,6 +19,9 @@ extern float divergence;
 
 extern unsigned int stay_waypoint_3D;
 
+extern bool_t train_dictionary;
+extern bool_t extract_distribution;
+
 // Called by plugin
 void my_plugin_init(void);
 void my_plugin_run(unsigned char *frame);

@@ -2861,7 +2861,7 @@ void YUV422TORGB(unsigned char *YUV, unsigned char *RGB, unsigned char *GRAY, in
 void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height)
 {
 	FILE *fp;
-	fp=fopen("./data/video/yuyv.dat", "w");
+	fp=fopen("/data/video/yuyv.dat", "w");
 
 	// convert to grayscale image (verified)
 //	unsigned char *grayframe;
@@ -2900,7 +2900,8 @@ void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_wo
 	int n_clusters = n_words;
 	int clustered_ps = patch_size; // use even number fo YUV image
 
-	unsigned char *buf = frame;
+	unsigned char *buf;
+//	buf = NULL;
 	// ************************
 	//       LEARNING
 	// ************************
@@ -2934,6 +2935,7 @@ void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_wo
 //					c_word[i][j] = (float *)calloc(3,sizeof(float));
 //				}
 //			}
+//			int i_frame = 0;
 
 			// take the sample
 			for(i = 0; i < clustered_ps; i++)
@@ -2944,14 +2946,18 @@ void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_wo
 					// put it in a word
 					// U/V component
 //					c_word[i][j][1]
-		        	buf += j;
 					color_words[w][i][j][0] = (float) *buf;
 					// Y1/Y2 component
 //					c_word[i][j][0]
 					buf += 1;
 					color_words[w][i][j][1] = (float) *buf;
+					buf += 1;
+//					printf("%f %f ",color_words[w][i][j][0],color_words[w][i][j][1]);
+//					printf("%u %u ",frame[(Width * 2 * (i+y)) + 2*(x + j)],frame[(Width * 2 * (i+y)) + 2*(x + j ) + 1]);
+//					printf("%u",frame[i_frame++]);
 				}
 			}
+//			printf("\n");
 		}
 		*filled = 1;
 	}
@@ -2989,11 +2995,11 @@ void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_wo
 				for(j = 0; j < clustered_ps; j++)
 				{
 					// U/V component
-		        	buf += j;
 		        	p[i][j][0] = (float) *buf;
 					// Y1/Y2 component
 					buf += 1;
 					p[i][j][1] = (float) *buf;
+					buf += 1;
 				}
 			}
 
@@ -3061,7 +3067,6 @@ void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_wo
 
 }
 
-/*
 void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height)
 {
 	int i, j, s, word, c; //loop variables
@@ -3072,7 +3077,6 @@ void DistributionExtraction(float ****color_words, unsigned char *frame, float* 
 	int FULL_SAMPLING;
 
 	unsigned char *buf;
-	buf = frame;
 
 	if(RANDOM_SAMPLES == 1)
 	{
@@ -3125,11 +3129,11 @@ void DistributionExtraction(float ****color_words, unsigned char *frame, float* 
 			for(j = 0; j < clustered_ps; j++)
 			{
 				// U/V component
-	        	buf += j;
 	        	p[i][j][0] = (float) *buf;
 				// Y1/Y2 component
 				buf += 1;
 				p[i][j][1] = (float) *buf;
+				buf += 1;
 			}
 		}
 
@@ -3251,7 +3255,8 @@ void DistributionExtraction(float ****color_words, unsigned char *frame, float* 
 	}
 	free(p);
 
+	buf = NULL;
 	free(buf);
 
 } // EXECUTION
-*/
+
