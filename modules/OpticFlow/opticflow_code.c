@@ -283,17 +283,17 @@ void my_plugin_run(unsigned char *frame)
 	// Additional information from other sensors
 	// ***********************************************************************************************************************
 
-#if USE_SONAR
-		cam_h = ins_impl.sonar_z;
-#else
-		cam_h = 1;
-		prev_cam_h = 1;
-#endif
-
-		camh_buf[buf_point_camh] = cam_h;
-		buf_point_camh = (buf_point_camh+1) %11;
-		quick_sort(camh_buf,11);
-		cam_h_med = camh_buf[6];
+//#if USE_SONAR
+//		cam_h = ins_impl.sonar_z;
+//#else
+//		cam_h = 1;
+//		prev_cam_h = 1;
+//#endif
+//
+//		camh_buf[buf_point_camh] = cam_h;
+//		buf_point_camh = (buf_point_camh+1) %11;
+//		quick_sort(camh_buf,11);
+//		cam_h_med = camh_buf[6];
 
 	// ***********************************************************************************************************************
 	// (1) possibly find new points - keeping possible old ones (normal cv methods / efficient point finding / active corners)
@@ -435,48 +435,47 @@ void my_plugin_run(unsigned char *frame)
 	if(USE_FITTING == 1)
 	{
 		analyseTTI(&z_x, &z_y, &three_dimensionality, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, count, imgWidth, imgHeight, &DIV_FILTER);
-		if(count>3)
+
+		if (USE_MEAN_3D == 1)
 		{
-			if (USE_MEAN_3D == 1)
-			{
 
-				div_buf_3D[div_point_3D] = three_dimensionality;
-				div_point_3D = (div_point_3D+1) %mov_block_3D; // index starts from 0 to mov_block
-				div_avg_3D = 0.0;
-				for (int im=0;im<mov_block_3D;im++) {
-					div_avg_3D+=div_buf_3D[im];
-				}
-				three_dimensionality = (float) div_avg_3D/ mov_block_3D;
+			div_buf_3D[div_point_3D] = three_dimensionality;
+			div_point_3D = (div_point_3D+1) %mov_block_3D; // index starts from 0 to mov_block
+			div_avg_3D = 0.0;
+			for (int im=0;im<mov_block_3D;im++) {
+				div_avg_3D+=div_buf_3D[im];
 			}
-			else if(USE_MEDIAN_3D == 1)
-			{
-				div_buf_3D[div_point_3D] = three_dimensionality;
-				div_point_3D = (div_point_3D+1) %mov_block_3D;
-				quick_sort(div_buf_3D,mov_block_3D);
-				three_dimensionality = div_buf_3D[mov_block_3D/2];
-			}
-			else
-			{
-
-			}
-			if ((three_dimensionality < threshold_3D_low))
-			{
-				land_safe = 1.0;
-			}
-			else
-			{
-				land_safe = 0.0;
-			}
-			if (three_dimensionality > threshold_3D_high)
-			{
-				land_safe_false = 1.0;
-			}
-			else
-			{
-				land_safe_false = 0.0;
-			}
+			three_dimensionality = (float) div_avg_3D/ mov_block_3D;
+		}
+		else if(USE_MEDIAN_3D == 1)
+		{
+			div_buf_3D[div_point_3D] = three_dimensionality;
+			div_point_3D = (div_point_3D+1) %mov_block_3D;
+			quick_sort(div_buf_3D,mov_block_3D);
+			three_dimensionality = div_buf_3D[mov_block_3D/2];
 		}
 		else
+		{
+
+		}
+		if ((three_dimensionality < threshold_3D_low))
+		{
+			land_safe = 1.0;
+		}
+		else
+		{
+			land_safe = 0.0;
+		}
+		if (three_dimensionality > threshold_3D_high)
+		{
+			land_safe_false = 1.0;
+		}
+		else
+		{
+			land_safe_false = 0.0;
+		}
+
+		if(count < 3)
 		{
 			land_safe = 0.0;
 			land_safe_false = 0.0;

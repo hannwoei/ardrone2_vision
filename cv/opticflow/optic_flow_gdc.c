@@ -2324,7 +2324,7 @@ void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int im
 	// a)
 
 	// FAST corner:
-	int fast_threshold = 10; //10
+	int fast_threshold = 15; //10
 	xyFAST* pnts_fast;
 
 	CvtYUYV2Gray(gray_frame, frame, imW, imH); // convert to gray scaled image is a must for FAST corner
@@ -2558,6 +2558,12 @@ void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_
 		if(n_samples < 3)
 		{
 			// set dummy values for tti, etc.
+			*z_x = 0.0;
+			*z_y = 0.0;
+			*three_dimensionality = 0.0;
+			*POE_x = 0.0;
+			*POE_y = 0.0;
+			*divergence = 0.0;
 			*mean_tti = 1000.0f / 60;
 			*median_tti = *mean_tti;
 			*d_heading = 0;
