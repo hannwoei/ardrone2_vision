@@ -3073,7 +3073,7 @@ void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_wo
 
 }
 
-void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height)
+void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height, int border_width, int border_height)
 {
 	int i, j, s, word, c; //loop variables
 	int x, y;
@@ -3119,8 +3119,8 @@ void DistributionExtraction(float ****color_words, unsigned char *frame, float* 
 		if(RANDOM_SAMPLES)
 		{
 			s++;
-			x = rand() % (Width - clustered_ps);
-			y = rand() % (Height - clustered_ps);
+			x = border_width + rand() % (Width - clustered_ps - 2*border_width);
+			y = border_height + rand() % (Height - clustered_ps - 2*border_height);
 		}
 		// FASTER: What if we determine the closest word while updating the distances at the last pixel?
 		// reset word_distances

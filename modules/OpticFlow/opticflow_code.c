@@ -120,6 +120,8 @@ bool_t extract_distribution;
 
 int RANDOM_SAMPLES;
 float *word_distribution;
+float fake_3D;
+int border_width, border_height;
 
 #ifndef VISION_TRAIN_DICTIONARY
 #define VISION_TRAIN_DICTIONARY FALSE
@@ -227,7 +229,7 @@ void my_plugin_init(void)
 	patch_size = 6;
 	n_samples = 200000;
 	learned_samples = 0;
-	n_samples_image = 100;
+	n_samples_image = 50; // 100: train dictionary
 	filled = 0;
 	alpha = 0.5;
 	WORDS = 0; // 0: train a dictionary
@@ -236,6 +238,9 @@ void my_plugin_init(void)
 	extract_distribution = VISION_EXTRACT_DISTRIBUTION;
 	save_dictionary = 1;
 	word_distribution = (float*)calloc(n_words,sizeof(float));
+	fake_3D = 0.0;
+	border_width = 80;
+	border_height = 60;
 	RANDOM_SAMPLES = 1;
 
 	// create a dictionary
@@ -642,14 +647,22 @@ void my_plugin_run(unsigned char *frame)
 
 	if(extract_distribution)
 	{
-		DistributionExtraction(dictionary, frame, word_distribution, n_words, patch_size, n_samples_image, RANDOM_SAMPLES, imgWidth, imgHeight);
+		DistributionExtraction(dictionary, frame, word_distribution, n_words, patch_size, n_samples_image, RANDOM_SAMPLES, imgWidth, imgHeight, border_width, border_height);
 
-		DOWNLINK_SEND_Distribution(DefaultChannel, DefaultDevice, &three_dimensionality, &word_distribution[0], &word_distribution[1], &word_distribution[2], &word_distribution[3], &word_distribution[4]
-		                                                                               , &word_distribution[5], &word_distribution[6], &word_distribution[7], &word_distribution[8], &word_distribution[9]
-		                                                                               , &word_distribution[10], &word_distribution[11], &word_distribution[12], &word_distribution[13], &word_distribution[14]
-		                                                                               , &word_distribution[15], &word_distribution[16], &word_distribution[17], &word_distribution[18], &word_distribution[19]
-		                                                                               , &word_distribution[20], &word_distribution[21], &word_distribution[22], &word_distribution[23], &word_distribution[24]
-		                                                                               , &word_distribution[25], &word_distribution[26], &word_distribution[27], &word_distribution[28], &word_distribution[29]);
+		fake_3D = 2294.5
+				+ word_distribution[0]*(-2145.1) + word_distribution[1]*(583.7) + word_distribution[2]*(-2166.2) + word_distribution[3]*(1624.4) + word_distribution[4]*(1012)
+				+ word_distribution[5]*(-2860.2) + word_distribution[6]*(-790.6) + word_distribution[7]*(5165.1) + word_distribution[8]*(226.8) + word_distribution[9]*(-3481.1)
+				+ word_distribution[10]*(-1765.4) + word_distribution[11]*(-3412) + word_distribution[12]*(-1787.9) + word_distribution[13]*(-2698.2) + word_distribution[14]*(67.6)
+				+ word_distribution[15]*(-6578.4) + word_distribution[16]*(-2859.1) + word_distribution[17]*(-8525.5) + word_distribution[18]*(4740.1) + word_distribution[19]*(37066.1)
+				+ word_distribution[20]*(-2455.2) + word_distribution[21]*(-459) + word_distribution[22]*(8448.4) + word_distribution[23]*(-2449) + word_distribution[24]*(-1939.3)
+				+ word_distribution[25]*(-482.3) + word_distribution[26]*(-6793.7) + word_distribution[27]*(552.6) + word_distribution[28]*(-2314.5) + word_distribution[29]*(-1205.5);
+
+//		DOWNLINK_SEND_Distribution(DefaultChannel, DefaultDevice, &three_dimensionality, &word_distribution[0], &word_distribution[1], &word_distribution[2], &word_distribution[3], &word_distribution[4]
+//		                                                                               , &word_distribution[5], &word_distribution[6], &word_distribution[7], &word_distribution[8], &word_distribution[9]
+//		                                                                               , &word_distribution[10], &word_distribution[11], &word_distribution[12], &word_distribution[13], &word_distribution[14]
+//		                                                                               , &word_distribution[15], &word_distribution[16], &word_distribution[17], &word_distribution[18], &word_distribution[19]
+//		                                                                               , &word_distribution[20], &word_distribution[21], &word_distribution[22], &word_distribution[23], &word_distribution[24]
+//		                                                                               , &word_distribution[25], &word_distribution[26], &word_distribution[27], &word_distribution[28], &word_distribution[29]);
 	}
 
 
@@ -672,7 +685,7 @@ void my_plugin_run(unsigned char *frame)
 //	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &stabilization_cmd[COMMAND_THRUST], &three_dimensionality);
 //	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &stay_waypoint_3D, &three_dimensionality);
 //	DOWNLINK_SEND_OPTIC_FLOW(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetSpeedEnu_i()->x, &stateGetSpeedEnu_i()->y, &stateGetSpeedEnu_i()->z, &Vely, &diff_roll, &diff_pitch, &cam_h_med, &count, &ins_impl.ltp_pos.z, &divergence, &ins_impl.ltp_speed.z, &land_safe, &land_safe_false, &d_heading, &d_pitch, &z_x, &z_y, &ins_impl.ltp_accel.z, n_inlier_minu, n_inlier_minv, &max_safe, &three_dimensionality);
-	DOWNLINK_SEND_LAND_SAFE(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,&stateGetSpeedEnu_i()->x, &stateGetSpeedEnu_i()->y, &stateGetSpeedEnu_i()->z, &ins_impl.ltp_pos.z, &diff_roll, &diff_pitch, &count, &divergence, &land_safe, &d_heading, &d_pitch, &z_x, &z_y, n_inlier_minu, n_inlier_minv, &max_safe, &active_3D, &three_dimensionality);
+	DOWNLINK_SEND_LAND_SAFE(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,&stateGetSpeedEnu_i()->x, &stateGetSpeedEnu_i()->y, &stateGetSpeedEnu_i()->z, &ins_impl.ltp_pos.z, &diff_roll, &diff_pitch, &count, &divergence, &land_safe, &fake_3D, &d_pitch, &z_x, &z_y, n_inlier_minu, n_inlier_minv, &max_safe, &active_3D, &three_dimensionality);
 
 }
 
