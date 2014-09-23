@@ -98,6 +98,7 @@ unsigned int mov_block_3D, div_point_3D;
 
 // tryout
 struct NedCoor_i OF_speed;
+int kl;
 
 // waypoint
 #include "navigation.h"
@@ -107,6 +108,13 @@ struct EnuCoor_i waypoints_3D[win_3D];
 struct EnuCoor_i waypoints_3D_min;
 float buf_3D[win_3D], avg_3D, min_3D;
 unsigned int buf_point_3D, init3D, stay_waypoint_3D, land_safe_count, max_safe, active_3D;
+
+// appearance
+float **** dictionary;
+int n_words, patch_size, n_samples, learned_samples, n_samples_image, filled;
+float alpha;
+int WORDS;
+int save_dictionary;
 
 // Called by plugin
 void my_plugin_init(void)
@@ -189,6 +197,7 @@ void my_plugin_init(void)
 	OF_speed.x = 0;
 	OF_speed.y = 0;
 	OF_speed.z = 0;
+	kl = 1;
 
 	//waypoints
 	avg_3D = 0.0;
@@ -198,10 +207,45 @@ void my_plugin_init(void)
 	land_safe_count = 0;
 	max_safe = 0;
 	active_3D = 0;
+
+	// appearance
+
+	n_words = 5;
+	patch_size = 6;
+	n_samples = 1000;
+	learned_samples = 0;
+	n_samples_image = 50;
+	filled = 0;
+	alpha = 0.5;
+	WORDS = 0; // 0: train a dictionary
+	save_dictionary = 1;
+	// create a dictionary
+	dictionary = (float ****)calloc(n_words,sizeof(float***));
+
+	for(int i = 0; i < n_words; i++)
+	{
+		dictionary[i] = (float ***)calloc(patch_size,sizeof(float **));
+
+		for(int j = 0; j < patch_size;j++)
+		{
+			dictionary[i][j] = (float **)calloc(patch_size,sizeof(float*));
+
+			for(int k = 0; k < patch_size; k++)
+			{
+				dictionary[i][j][k] = (float *)calloc(2,sizeof(float));
+			}
+		}
+	}
 }
 
 void my_plugin_run(unsigned char *frame)
 {
+	// save one YUV/RGB/GRAY image
+//	if(kl <5)
+//	{
+//		saveSingleImageDataFile(frame, imgWidth, imgHeight);
+//		kl ++;
+//	}
 
 #ifdef showframe
 	memcpy(copy_frame,frame,imgHeight*imgWidth*2);
@@ -491,6 +535,53 @@ void my_plugin_run(unsigned char *frame)
 		buf_point_3D = 0;
 	}
 
+	// *********************************************
+	// Dictionary Training
+	// *********************************************
+
+
+	if(!WORDS)
+	{
+		DictionaryTrainingYUV(dictionary, frame, n_words, patch_size, &learned_samples, n_samples_image, alpha, imgWidth, imgHeight, &filled);
+		printf("number of samples learnt = %d\n",learned_samples);
+	}
+
+	if(learned_samples >= n_samples)
+	{
+		printf("Done !!!\n");
+		WORDS = 1;
+		// lower learning rate
+		alpha = 0.0;
+
+		if(save_dictionary)
+		{
+			printf("save dictionary\n");
+			//save a dictionary
+			FILE *fd;
+			fd=fopen("./data/video/VisualWords.dat", "w");
+			fprintf(fd,"nothing\n");
+			// delete dictionary
+//			for(int i = 0; i < n_words; i++)
+//			{
+//				for(int j = 0; j < patch_size;j++)
+//				{
+//					for(int k = 0; k < patch_size; k++)
+//					{
+//						printf("0\n");
+////						fprintf(fdi, "%f\n",dictionary[i][j][k][0]);
+////						fprintf(fdi, "%f\n",dictionary[i][j][k][1]);
+////						free(dictionary[i][j][k]);
+//					}
+////					free(dictionary[i][j]);
+//				}
+////				free(dictionary[i]);
+//			}
+//			free(dictionary);
+			fclose(fd);
+			save_dictionary = 0;
+		}
+	}
+	printf("0\n");
 
 
 	// *********************************************

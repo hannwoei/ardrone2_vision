@@ -165,11 +165,11 @@ void *computervision_thread_main(void* data)
 	start_timer();
 
     // Resize: device by 4
-    resize_uyuv(img_new, &small, DOWNSIZE_FACTOR);
+    //resize_uyuv(img_new, &small, DOWNSIZE_FACTOR);
 
     // Process
-//    my_plugin_run(img_new->buf);
-	my_plugin_run(small.buf);
+    my_plugin_run(img_new->buf);
+//	my_plugin_run(small.buf);
 
 #ifdef DOWNLINK_VIDEO
     // JPEG encode the image:

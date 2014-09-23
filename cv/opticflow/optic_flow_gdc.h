@@ -58,6 +58,7 @@ void slopeEstimation(float *z_x, float *z_y, float *three_dimensionality, float 
 void quick_sort (float *a, int n);
 void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH);
 void yuyv_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst);
+void uyvy_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst);
 void setPointsToFlowPoints(struct flowPoint flow_points[], struct detectedPoint detected_points[], int *flow_point_size, int *count, int MAX_COUNT);
 void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[]);
 void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points0[],struct detectedPoint detected_points1[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
@@ -67,4 +68,8 @@ void subimage(unsigned char *gray_frame, unsigned char *subframe, int subimH, in
 void findDistributedPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *status);
 void trackDistributedPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
 void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint flow_points[], int count, int OF_FilterType);
+void YUV422TORGB(unsigned char *YUV, unsigned char *RGB, unsigned char *GRAY, int Width, int Height);
+void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height);
+void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_words, int patch_size, int *learned_samples, int n_samples_image, float alpha, int Width, int Height, int *filled);
+//void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height);
 #endif

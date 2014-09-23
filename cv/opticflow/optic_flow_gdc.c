@@ -2179,12 +2179,28 @@ void quick_sort (float *a, int n) {
     quick_sort(l, a + n - l);
 }
 
+//void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH){
+//    int x, y;
+//    unsigned char *Y, *gray;
+//    //get only Y component for grayscale from (Y1)(U1,2)(Y2)(V1,2)
+//    for (y = 0; y < imH; y++) {
+//        Y = frame + (imW * 2 * y);
+//        gray = grayframe + (imW * y);
+//        for (x=0; x < imW; x += 2) {
+//            gray[x] = *Y;
+//            Y += 2;
+//            gray[x + 1] = *Y;
+//            Y += 2;
+//        }
+//    }
+//}
+
 void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH){
     int x, y;
     unsigned char *Y, *gray;
-    //get only Y component for grayscale from (Y1)(U1,2)(Y2)(V1,2)
+    //get only Y component for grayscale from (U1,2)(Y1)(V1,2)(Y2)
     for (y = 0; y < imH; y++) {
-        Y = frame + (imW * 2 * y);
+        Y = frame + (imW * 2 * y) + 1;
         gray = grayframe + (imW * y);
         for (x=0; x < imW; x += 2) {
             gray[x] = *Y;
@@ -2197,6 +2213,7 @@ void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int i
 
 /* convert from 4:2:2 YUYV interlaced to RGB24 */
 /* based on ccvt_yuyv_bgr32() from camstream */
+//http://answers.opencv.org/question/9659/solved-how-to-make-opencv-to-ask-libv4l-yuyv/
 #define SAT(c) \
    if (c & (~255)) { if (c < 0) c = 0; else c = 255; }
 
@@ -2214,6 +2231,48 @@ void yuyv_to_rgb24 (int width, int height, unsigned char *src, unsigned char *ds
          cg = (*src++ - 128) * 88;
          kl2 = *src++;
          cr = ((*src - 128) * 359) >> 8;
+         cg = (cg + (*src++ - 128) * 183) >> 8;
+
+         r = kl1 + cr;
+         b = kl1 + cb;
+         g = kl1 - cg;
+         SAT(r);
+         SAT(g);
+         SAT(b);
+
+     *dst++ = b;
+     *dst++ = g;
+     *dst++ = r;
+
+         r = kl2 + cr;
+         b = kl2 + cb;
+         g = kl2 - cg;
+         SAT(r);
+         SAT(g);
+         SAT(b);
+
+     *dst++ = b;
+     *dst++ = g;
+     *dst++ = r;
+      }
+   }
+}
+
+
+void uyvy_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst)
+{
+   int l, c;
+   int r, g, b, cr, cg, cb, kl1, kl2;
+
+   l = height;
+   while (l--) {
+      c = width >> 1;
+      while (c--) {
+         cb = ((*src++ - 128) * 454) >> 8;
+         kl1 = *src;
+         cg = (*src++ - 128) * 88;
+         cr = ((*src++ - 128) * 359) >> 8;
+         kl2 = *src;
          cg = (cg + (*src++ - 128) * 183) >> 8;
 
          r = kl1 + cr;
@@ -2672,7 +2731,7 @@ void trackDistributedPoints(unsigned char *frame, unsigned char *prev_frame, int
 				remove_point = 1;
 			}
 
-			// error[i] can also be used, etc.
+			// error[i] can also be used, etc.https://www.facebook.com/kwongwah.my/photos/a.144520172328175.29951.144505178996341/656484874465033/?type=1&theater
 
 			if(remove_point)
 			{
@@ -2715,3 +2774,484 @@ void trackDistributedPoints(unsigned char *frame, unsigned char *prev_frame, int
 
 	return;
 }
+
+void YUV422TORGB(unsigned char *YUV, unsigned char *RGB, unsigned char *GRAY, int Width, int Height)
+{
+    int i, j;
+    unsigned char *Y, *gray;
+    unsigned char *rgb;
+    int y11, y22, u, v, temp;
+
+    //get only Y component for grayscale from (U)(Y11)(V)(Y22)
+    for (j = 0; j < Height; j++) {
+    	Y = YUV + (Width * 2 * j);
+    	gray = GRAY + (Width * j);
+    	rgb = RGB + (Width * j * 3);
+        for (i=0; i < Width; i += 2)
+        {
+        	// http://en.wikipedia.org/wiki/YUV#Converting_between_Y.27UV_and_RGB
+        	// ITU-R version
+        	u = (int) *Y - 128;
+        	Y += 1;
+        	gray[i] = *Y;
+        	y11 = (int) *Y;
+        	Y += 1;
+        	v = (int) *Y - 128;
+        	Y += 1;
+        	gray[i+1] = *Y;
+        	y22 = (int) *Y;
+        	Y += 1;
+
+        	temp = (y11 + v + (v>>2) + (v>>3) + (v>>5));
+        	rgb [3*i] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+        	temp = (y11 - ((u>>2) + (u>>4) + (u>>5)) - ((v>>1) + (v>>3) + (v>>4) + (v>>5)));
+        	rgb [3*i + 1] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+        	temp = (y11 + u + (u>>1) + (u>>2) + (u>>6));
+        	rgb [3*i + 2] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+        	temp = (y22 + v + (v>>2) + (v>>3) + (v>>5));
+        	rgb [3*i + 3] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+        	temp = (y22 - ((u>>2) + (u>>4) + (u>>5)) - ((v>>1) + (v>>3) + (v>>4) + (v>>5)));
+        	rgb [3*i + 4] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+        	temp = (y22 + u + (u>>1) + (u>>2) + (u>>6));
+        	rgb [3*i + 5] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+
+        	// android
+//        	rgb [3*i] =  (unsigned char) (y11 + ((v * 359) >> 8));
+//        	rgb [3*i + 1] = (unsigned char)  (y11 - ((u * 88 + v * 183) >> 8));
+//        	rgb [3*i + 2] = (unsigned char)  (y11 + ((u * 454) >> 8));
+//        	rgb [3*i + 3] = (unsigned char) (y22 + ((v * 359) >> 8));
+//        	rgb [3*i + 4] = (unsigned char)  (y22 - ((u * 88 + v * 183) >> 8));
+//        	rgb [3*i + 5] = (unsigned char)  (y22 + ((u * 454) >> 8));
+//
+//            SAT(rgb [3*i]);
+//            SAT(rgb [3*i + 1]);
+//            SAT(rgb [3*i + 2]);
+//            SAT(rgb [3*i + 3]);
+//            SAT(rgb [3*i + 4]);
+//            SAT(rgb [3*i + 5]);
+
+        	// NTSC standard
+//        	u = (int) *Y - 128;
+//        	Y += 1;
+//        	y11 = (int)*Y - 16;
+//        	Y += 1;
+//        	v = (int) *Y - 128;
+//        	Y += 1;
+//        	y22 = (int) *Y - 16;
+//        	Y += 1;
+//
+//        	temp = (298 * y11 + 409 * v) >> 8;
+//        	rgb [3*i] =(unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+//        	temp = (298 * y11 - 100 * u - 208 * v) >> 8;
+//        	rgb [3*i + 1] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+//        	temp = (298 * y11 + 516 * u) >> 8;
+//        	rgb [3*i + 2] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+//
+//         	temp = (298 * y22 + 409 * v) >> 8;
+//			rgb [3*i + 3] =(unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+//			temp = (298 * y22 - 100 * u - 208 * v) >> 8;
+//			rgb [3*i + 4] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+//			temp = (298 * y22 + 516 * u) >> 8;
+//			rgb [3*i + 4] = (unsigned char) ((temp < 0) ? 0: ((temp > 255) ? 255: temp));
+        }
+    }
+}
+
+
+void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height)
+{
+	FILE *fp;
+	fp=fopen("./data/video/yuyv.dat", "w");
+
+	// convert to grayscale image (verified)
+//	unsigned char *grayframe;
+//	grayframe = (unsigned char*) calloc(width*height,sizeof(unsigned char));
+//	CvtYUYV2Gray(grayframe, frame_buf, width, height);
+
+	// convert to rgb
+	unsigned char *RGB;
+	RGB = (unsigned char *)calloc(width*height*3,sizeof(unsigned char));
+	unsigned char *grayframe;
+	grayframe = (unsigned char*) calloc(width*height,sizeof(unsigned char));
+	YUV422TORGB(frame_buf, RGB, grayframe, width, height);
+//	uyvy_to_rgb24 (width, height, frame_buf, RGB);
+
+	for(int i = 0; i<height; i++)
+	{
+		for(int j = 0; j<width*3; j++) //for RGB
+//		for(int j = 0; j<width*2; j++) // for UYVY
+//		for(int j = 0; j<width; j++)   // for grayscale
+		{
+			fprintf(fp, "%u\n",RGB[i * width * 3 + j]); // for RGB
+//			fprintf(fp, "%u\n",frame_buf[i * width * 2 + j]); // for UYVY
+//			fprintf(fp, "%u\n",grayframe[i * width + j]); // use "mat2gray()" to convert it to grayscale image and then show it with "imshow()"
+		}
+	}
+	fclose(fp);
+	free(grayframe);
+	free(RGB);
+}
+
+void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_words, int patch_size, int *learned_samples, int n_samples_image, float alpha, int Width, int Height, int *filled)
+{
+	int i, j, w, s, word, c; //loop variables
+	int x,y;
+	float error_word;
+	int n_clusters = n_words;
+	int clustered_ps = patch_size; // use even number fo YUV image
+
+	unsigned char *buf = frame;
+	// ************************
+	//       LEARNING
+	// ************************
+	//printf("Learning\n");
+	if(!(*filled))
+	{
+		// **************
+		// INITIALISATION
+		// **************
+
+		// we fix the values, so that the user cannot change them anymore with the control of the module.
+//		printf("n_words = %d, patch_size = %d, n_samples = %d\n", n_words, patch_size, n_samples);
+
+		// in the first image, we fill the neighbours/ words with the present patches
+		for(w = 0; w < n_words; w++)
+		{
+			// select a coordinate
+			x = rand() % (Width - clustered_ps);
+			y = rand() % (Height - clustered_ps);
+
+			// create a word
+//			float *** c_word;
+//			c_word = (float ***)calloc(clustered_ps,sizeof(float**));
+//
+//			for(i = 0; i < clustered_ps; i++)
+//			{
+//				c_word[i] = (float **)calloc(clustered_ps,sizeof(float *));
+//
+//				for(j = 0; j < clustered_ps;j++)
+//				{
+//					c_word[i][j] = (float *)calloc(3,sizeof(float));
+//				}
+//			}
+
+			// take the sample
+			for(i = 0; i < clustered_ps; i++)
+			{
+				buf = frame + (Width * 2 * (i+y)) + 2*x;
+				for(j = 0; j < clustered_ps; j++)
+				{
+					// put it in a word
+					// U/V component
+//					c_word[i][j][1]
+		        	buf += j;
+					color_words[w][i][j][0] = (float) *buf;
+					// Y1/Y2 component
+//					c_word[i][j][0]
+					buf += 1;
+					color_words[w][i][j][1] = (float) *buf;
+				}
+			}
+		}
+		*filled = 1;
+	}
+	else
+	{
+		printf("Learning\n");
+		float *word_distances, ***p;
+		word_distances = (float *)calloc(n_clusters,sizeof(float));
+		p = (float ***)calloc(clustered_ps,sizeof(float**));
+
+		for(i = 0; i < clustered_ps; i++)
+		{
+			p[i] = (float **)calloc(clustered_ps,sizeof(float*));
+			for(j = 0; j < clustered_ps;j++)
+			{
+				p[i][j] = (float *)calloc(2,sizeof(float));
+			}
+		}
+
+		for(s = 0; s < n_samples_image; s++)
+		{
+			// select a random sample from the image
+			x = rand() % (Width - clustered_ps);
+			y = rand() % (Height - clustered_ps);
+
+			// reset word_distances
+			for(word = 0; word < n_clusters; word++)
+			{
+				word_distances[word] = 0;
+			}
+			// extract sample
+			for(i = 0; i < clustered_ps; i++)
+			{
+				buf = frame + (Width * 2 * (i+y)) + 2*x;
+				for(j = 0; j < clustered_ps; j++)
+				{
+					// U/V component
+		        	buf += j;
+		        	p[i][j][0] = (float) *buf;
+					// Y1/Y2 component
+					buf += 1;
+					p[i][j][1] = (float) *buf;
+				}
+			}
+
+			// determine distances to the words:
+			for(i = 0; i < clustered_ps; i++)
+			{
+				for(j = 0; j < clustered_ps; j++)
+				{
+					for(c = 0; c < 2; c++)
+					{
+						// determine the distance to words
+						for(word = 0; word < n_clusters; word++)
+						{
+							word_distances[word] += (p[i][j][c] - color_words[word][i][j][c])
+													* (p[i][j][c] - color_words[word][i][j][c]);
+						}
+					}
+				}
+			}
+			// determine the nearest neighbour
+			// search the closest centroid
+			int assignment = 0;
+			float min_dist = word_distances[0];
+			for(word = 1; word < n_clusters; word++)
+			{
+				if(word_distances[word] < min_dist)
+				{
+					min_dist = word_distances[word];
+					assignment = word;
+				}
+			}
+
+			// move the neighbour closer to the input
+			for(i = 0; i < clustered_ps; i++)
+			{
+				for(j = 0; j < clustered_ps; j++)
+				{
+					for(c = 0; c < 2; c++)
+					{
+						// CDW: opgelet: weet je zeker dat deze error moet worden afgerond? Wat hier staat is error=floor(p-word)
+						error_word = p[i][j][c] - color_words[assignment][i][j][c];
+						color_words[assignment][i][j][c] += (alpha * error_word);
+					}
+				}
+			}
+
+			*learned_samples = *learned_samples + 1;
+		}
+
+		for(i = 0; i < clustered_ps; i++)
+		{
+			for(j = 0; j < clustered_ps; j++)
+			{
+                free(p[i][j]);
+			}
+			free(p[i]);
+		}
+		free(p);
+		free(word_distances);
+	}
+	buf = NULL;
+	free(buf);
+
+//	printf("gathered samples = %d / %d.\n", learned_samples, N_SAMPLES);
+
+}
+
+/*
+void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height)
+{
+	int i, j, s, word, c; //loop variables
+	int x, y;
+	int n_clusters = n_words;
+	int clustered_ps = patch_size; // use even number fo YUV image
+	int n_extracted_words = 0;
+	int FULL_SAMPLING;
+
+	unsigned char *buf;
+	buf = frame;
+
+	if(RANDOM_SAMPLES == 1)
+	{
+		FULL_SAMPLING = 0;
+	}
+	else
+	{
+		FULL_SAMPLING = 1;
+	}
+	// ************************
+	//       EXECUTION
+	// ************************
+//	printf("Execution\n");
+
+	float *word_distances, ***p;
+	word_distances = (float *)calloc(n_clusters,sizeof(float));
+	p = (float ***)calloc(clustered_ps,sizeof(float**));
+
+	for(i = 0; i < clustered_ps; i++)
+	{
+		p[i] = (float **)calloc(clustered_ps,sizeof(float*));
+		for(j = 0; j < clustered_ps;j++)
+		{
+			p[i][j] = (float *)calloc(2,sizeof(float));
+		}
+	}
+
+	int finished = 0;
+	x = 0;
+	y = 0;
+	s = 0;
+	while(!finished)
+	{
+		if(RANDOM_SAMPLES)
+		{
+			s++;
+			x = rand() % (Width - clustered_ps);
+			y = rand() % (Height - clustered_ps);
+		}
+		// FASTER: What if we determine the closest word while updating the distances at the last pixel?
+		// reset word_distances
+		for(word = 0; word < n_clusters; word++)
+		{
+			word_distances[word] = 0;
+		}
+		// extract sample
+		for(i = 0; i < clustered_ps; i++)
+		{
+			buf = frame + (Width * 2 * (i+y)) + 2*x;
+			for(j = 0; j < clustered_ps; j++)
+			{
+				// U/V component
+	        	buf += j;
+	        	p[i][j][0] = (float) *buf;
+				// Y1/Y2 component
+				buf += 1;
+				p[i][j][1] = (float) *buf;
+			}
+		}
+
+		// The following comparison with all words in the dictionary can be made faster by:
+		// a) not comparing all pixels, but stopping early
+		// b) using a different distance measure such as L1
+		// determine distances:
+		for(i = 0; i < clustered_ps; i++)
+		{
+			for(j = 0; j < clustered_ps; j++)
+			{
+				for(c = 0; c < 2; c++)
+				{
+					// determine the distance to words
+					for(word = 0; word < n_clusters; word++)
+					{
+						word_distances[word] += (p[i][j][c] - color_words[word][i][j][c])
+												* (p[i][j][c] - color_words[word][i][j][c]);
+					}
+				}
+			}
+		}
+
+		// determine the nearest neighbour
+		// search the closest centroid
+		int assignment = 0;
+		float min_dist = word_distances[0];
+		for(word = 1; word < n_clusters; word++)
+		{
+			if(word_distances[word] < min_dist)
+			{
+				min_dist = word_distances[word];
+				assignment = word;
+			}
+		}
+
+		// put the assignment in the histogram
+		word_distribution[assignment]++;
+
+		n_extracted_words++;
+
+		if(RANDOM_SAMPLES)
+		{
+			if(s == n_samples_image)
+			{
+				finished = 1;
+			}
+		}
+		else
+		{
+			if(!FULL_SAMPLING)
+				y += clustered_ps;
+			else
+				y++;
+
+			if(y > Height - clustered_ps)
+			{
+				if(!FULL_SAMPLING)
+					x += clustered_ps;
+				else
+					x++;
+				y = 0;
+			}
+			if(x > Width - clustered_ps)
+			{
+				finished = 1;
+			}
+		}
+	} // sampling
+
+	// Normalize distribution:
+	// can be made faster by not determining max, min, and avg (only needed for visualization)
+	float max_p = 0;
+	float min_p = 1;
+	float avg_p = 0;
+	for(i = 0; i < n_clusters; i++)
+	{
+		word_distribution[i] = word_distribution[i] / (float) n_extracted_words;
+		if(word_distribution[i] > max_p) max_p = word_distribution[i];
+		if(word_distribution[i] < min_p) min_p = word_distribution[i];
+		avg_p += word_distribution[i];
+	}
+	avg_p = avg_p /(float) n_clusters;
+
+//	if(FULL_SAMPLING)
+//	{
+//		FILE *myfile;
+//		// if file left empty by user, fill it.
+//		char full_filename[255];
+//		strcpy(full_filename,"./full_sampling.dat");
+//
+//		myfile = fopen(full_filename,"a");
+//		if (myfile == 0)
+//		{
+//			printf("VisualWordsKohonen_C failed to open file '%s'\n",full_filename);
+//		}
+//
+//		for(i = 0; i < n_clusters; i++)
+//		{
+//			if(i < n_clusters - 1)
+//				fprintf(myfile, "%f ", word_distribution[i]);
+//			else
+//				fprintf(myfile, "%f\n", word_distribution[i]);
+//		}
+//
+//		if(myfile != 0)
+//		{
+//			fclose(myfile);
+//		}
+//	}
+
+	for(i = 0; i < clustered_ps; i++)
+	{
+		for(j = 0; j < clustered_ps; j++)
+		{
+			   free(p[i][j]);
+		}
+		free(p[i]);
+	}
+	free(p);
+
+	free(buf);
+
+} // EXECUTION
+*/
