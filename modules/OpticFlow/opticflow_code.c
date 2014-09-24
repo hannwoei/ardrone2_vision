@@ -105,6 +105,7 @@ int kl;
 #include "generated/flight_plan.h"
 #define win_3D 300
 struct EnuCoor_i waypoints_3D[win_3D];
+struct EnuCoor_i waypoints_Distribution;
 struct EnuCoor_i waypoints_3D_min;
 float buf_3D[win_3D], avg_3D, min_3D;
 unsigned int buf_point_3D, init3D, stay_waypoint_3D, land_safe_count, max_safe, active_3D;
@@ -123,12 +124,24 @@ float *word_distribution;
 float fake_3D;
 int border_width, border_height;
 
+// snapshot
+char filename[100];
+int i_frame;
+bool_t snapshot;
+unsigned int land_distribution;
+unsigned int land_distribution_count;
+unsigned int max_safe_distribution;
+
 #ifndef VISION_TRAIN_DICTIONARY
 #define VISION_TRAIN_DICTIONARY FALSE
 #endif
 
 #ifndef VISION_EXTRACT_DISTRIBUTION
 #define VISION_EXTRACT_DISTRIBUTION FALSE
+#endif
+
+#ifndef VISION_SNAPSHOT
+#define VISION_SNAPSHOT FALSE
 #endif
 
 // Called by plugin
@@ -239,8 +252,14 @@ void my_plugin_init(void)
 	save_dictionary = 1;
 	word_distribution = (float*)calloc(n_words,sizeof(float));
 	fake_3D = 0.0;
-	border_width = 80;
-	border_height = 60;
+	border_width = 80; // 80
+	border_height = 60; //60
+	i_frame = 0;
+	snapshot = VISION_SNAPSHOT;
+	land_distribution = 0;
+	land_distribution_count = 0;
+	max_safe_distribution = 0;
+
 	RANDOM_SAMPLES = 1;
 
 	// create a dictionary
@@ -270,7 +289,7 @@ void my_plugin_run(unsigned char *frame)
 	// save one YUV/RGB/GRAY image
 //	if(kl <5)
 //	{
-//		saveSingleImageDataFile(frame, imgWidth, imgHeight);
+//		saveSingleImageDataFile(frame, imgWidth, imgHeight, 0);
 //		kl ++;
 //	}
 
@@ -526,40 +545,7 @@ void my_plugin_run(unsigned char *frame)
 ////		NavCopyWaypoint(WP_safe,WP_p2);
 //	}
 
-	if((!stay_waypoint_3D) && ((abs(stateGetSpeedEnu_i()->x) > SPEED_BFP_OF_REAL(0.3)) || (abs(stateGetSpeedEnu_i()->y) > SPEED_BFP_OF_REAL(0.3)))) // new waypoints are created only when it is in flight with height > 3m
-	{
-		active_3D = 1;
-		if(land_safe == 1)
-		{
-			waypoints_3D[buf_point_3D].x = stateGetPositionEnu_i()->x;
-			waypoints_3D[buf_point_3D].y = stateGetPositionEnu_i()->y;
-			waypoints_3D[buf_point_3D].z = stateGetPositionEnu_i()->z; // SONAR problem?: when USE_SONAR is activated, the fusion result gives wrong height estimate
-			buf_point_3D = (buf_point_3D+1) %win_3D; // index starts from 0 to mov_block
 
-			land_safe_count ++;
-		}
-		else
-		{
-			if(land_safe_count > max_safe) //land with the largest possibility of safe region
-			{
-				max_safe = land_safe_count;
-				if (buf_point_3D > 2) nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
-			}
-			land_safe_count = 0;
-			buf_point_3D = 0;
-		}
-	}
-	else
-	{
-		active_3D = 0;
-		if(land_safe_count > max_safe)
-		{
-			max_safe = land_safe_count;
-			if (buf_point_3D > 2) nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
-		}
-		land_safe_count = 0;
-		buf_point_3D = 0;
-	}
 
 	// *********************************************
 	// Dictionary Training
@@ -657,12 +643,106 @@ void my_plugin_run(unsigned char *frame)
 				+ word_distribution[20]*(-2455.2) + word_distribution[21]*(-459) + word_distribution[22]*(8448.4) + word_distribution[23]*(-2449) + word_distribution[24]*(-1939.3)
 				+ word_distribution[25]*(-482.3) + word_distribution[26]*(-6793.7) + word_distribution[27]*(552.6) + word_distribution[28]*(-2314.5) + word_distribution[29]*(-1205.5);
 
-//		DOWNLINK_SEND_Distribution(DefaultChannel, DefaultDevice, &three_dimensionality, &word_distribution[0], &word_distribution[1], &word_distribution[2], &word_distribution[3], &word_distribution[4]
+		if(fake_3D < 400.0)
+		{
+			land_distribution = 1;
+		}
+		else
+		{
+			land_distribution = 0;
+		}
+
+//		DOWNLINK_SEND_Distribution(DefaultChannel, DefaultDevice, &three_dimensionality, &fake_3D, &snapshot, &land_distribution
+//																					   , &word_distribution[0], &word_distribution[1], &word_distribution[2], &word_distribution[3], &word_distribution[4]
 //		                                                                               , &word_distribution[5], &word_distribution[6], &word_distribution[7], &word_distribution[8], &word_distribution[9]
 //		                                                                               , &word_distribution[10], &word_distribution[11], &word_distribution[12], &word_distribution[13], &word_distribution[14]
 //		                                                                               , &word_distribution[15], &word_distribution[16], &word_distribution[17], &word_distribution[18], &word_distribution[19]
 //		                                                                               , &word_distribution[20], &word_distribution[21], &word_distribution[22], &word_distribution[23], &word_distribution[24]
 //		                                                                               , &word_distribution[25], &word_distribution[26], &word_distribution[27], &word_distribution[28], &word_distribution[29]);
+
+	}
+	if(snapshot)
+	{
+		if(land_distribution)
+		{
+			sprintf(filename, "/data/video/safe_%d.dat", i_frame);
+			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+		}
+		else
+		{
+			sprintf(filename, "/data/video/unsafe_%d.dat", i_frame);
+			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+		}
+		snapshot = FALSE;
+		i_frame ++ ;
+	}
+
+	// *********************************************
+	// move way point to the safe location
+	// *********************************************
+
+	if(extract_distribution)
+	{
+		if((!stay_waypoint_3D) && ((abs(stateGetSpeedEnu_i()->x) < SPEED_BFP_OF_REAL(0.1)) && (abs(stateGetSpeedEnu_i()->y) < SPEED_BFP_OF_REAL(0.1))))
+		{
+			if(land_distribution)
+			{
+				land_distribution_count++;
+			}
+			else
+			{
+				land_distribution_count = 0;
+			}
+
+			if(land_distribution_count > 120) // stay there 2 seconds
+			{
+				waypoints_Distribution.x = stateGetPositionEnu_i()->x;
+				waypoints_Distribution.y = stateGetPositionEnu_i()->y;
+				waypoints_Distribution.z = stateGetPositionEnu_i()->z;
+				nav_move_waypoint(WP_safe, &waypoints_Distribution);
+			}
+		}
+		else
+		{
+			land_distribution_count = 0;
+		}
+	}
+	else
+	{
+		if((!stay_waypoint_3D) && ((abs(stateGetSpeedEnu_i()->x) > SPEED_BFP_OF_REAL(0.3)) || (abs(stateGetSpeedEnu_i()->y) > SPEED_BFP_OF_REAL(0.3))))
+		{
+			active_3D = 1;
+			if(land_safe == 1)
+			{
+				waypoints_3D[buf_point_3D].x = stateGetPositionEnu_i()->x;
+				waypoints_3D[buf_point_3D].y = stateGetPositionEnu_i()->y;
+				waypoints_3D[buf_point_3D].z = stateGetPositionEnu_i()->z; // SONAR problem?: when USE_SONAR is activated, the fusion result gives wrong height estimate
+				buf_point_3D = (buf_point_3D+1) %win_3D; // index starts from 0 to mov_block
+
+				land_safe_count ++;
+			}
+			else
+			{
+				if(land_safe_count > max_safe) //land with the largest possibility of safe region
+				{
+					max_safe = land_safe_count;
+					if (buf_point_3D > 2) nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
+				}
+				land_safe_count = 0;
+				buf_point_3D = 0;
+			}
+		}
+		else
+		{
+			active_3D = 0;
+			if(land_safe_count > max_safe)
+			{
+				max_safe = land_safe_count;
+				if (buf_point_3D > 2) nav_move_waypoint(WP_safe, &waypoints_3D[buf_point_3D/2]); // save the waypoint having the minimum 3D value
+			}
+			land_safe_count = 0;
+			buf_point_3D = 0;
+		}
 	}
 
 

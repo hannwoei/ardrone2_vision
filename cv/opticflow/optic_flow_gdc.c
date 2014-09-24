@@ -2863,11 +2863,14 @@ void YUV422TORGB(unsigned char *YUV, unsigned char *RGB, unsigned char *GRAY, in
     }
 }
 
+int i_frame = 0;
 
-void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height)
+void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height, char filename[100])
 {
+
 	FILE *fp;
-	fp=fopen("/data/video/yuyv.dat", "w");
+
+	fp=fopen(filename, "w");
 
 	// convert to grayscale image (verified)
 //	unsigned char *grayframe;
@@ -2875,27 +2878,33 @@ void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height)
 //	CvtYUYV2Gray(grayframe, frame_buf, width, height);
 
 	// convert to rgb
-	unsigned char *RGB;
-	RGB = (unsigned char *)calloc(width*height*3,sizeof(unsigned char));
-	unsigned char *grayframe;
-	grayframe = (unsigned char*) calloc(width*height,sizeof(unsigned char));
-	YUV422TORGB(frame_buf, RGB, grayframe, width, height);
+//	unsigned char *RGB;
+//	RGB = (unsigned char *)calloc(width*height*3,sizeof(unsigned char));
+//	unsigned char *grayframe;
+//	grayframe = (unsigned char*) calloc(width*height,sizeof(unsigned char));
+//	YUV422TORGB(frame_buf, RGB, grayframe, width, height);
 //	uyvy_to_rgb24 (width, height, frame_buf, RGB);
-
-	for(int i = 0; i<height; i++)
+	if(fp == NULL)
 	{
-		for(int j = 0; j<width*3; j++) //for RGB
-//		for(int j = 0; j<width*2; j++) // for UYVY
-//		for(int j = 0; j<width; j++)   // for grayscale
-		{
-			fprintf(fp, "%u\n",RGB[i * width * 3 + j]); // for RGB
-//			fprintf(fp, "%u\n",frame_buf[i * width * 2 + j]); // for UYVY
-//			fprintf(fp, "%u\n",grayframe[i * width + j]); // use "mat2gray()" to convert it to grayscale image and then show it with "imshow()"
-		}
+		perror("Error while opening the file.\n");
 	}
-	fclose(fp);
-	free(grayframe);
-	free(RGB);
+	else
+	{
+		for(int i = 0; i<height; i++)
+		{
+	//		for(int j = 0; j<width*3; j++) //for RGB
+			for(int j = 0; j<width*2; j++) // for UYVY
+	//		for(int j = 0; j<width; j++)   // for grayscale
+			{
+	//			fprintf(fp, "%u\n",RGB[i * width * 3 + j]); // for RGB
+				fprintf(fp, "%u\n",frame_buf[i * width * 2 + j]); // for UYVY
+	//			fprintf(fp, "%u\n",grayframe[i * width + j]); // use "mat2gray()" to convert it to grayscale image and then show it with "imshow()"
+			}
+		}
+		fclose(fp);
+	}
+//	free(grayframe);
+//	free(RGB);
 }
 
 void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_words, int patch_size, int *learned_samples, int n_samples_image, float alpha, int Width, int Height, int *filled)
