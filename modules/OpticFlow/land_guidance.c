@@ -35,7 +35,7 @@
 #include "stabilization.h"
 #include "firmwares/rotorcraft/guidance/guidance_v.h"
 #include "autopilot.h"
-#include "subsystems/nav.h"
+// #include "subsystems/nav.h"
 
 // Know waypoint numbers and blocks
 //#include "generated/flight_plan.h"
@@ -249,7 +249,7 @@ void run_opticflow_land(void)
 		off_count = 0;
 	}
 	// Land if the drone is close to ground after 3 seconds touchdown assuming 60fps
-	if(off_count > 180) NavKillThrottle();
+	// if(off_count > 180) NavKillThrottle();
 	div_err_prev = div_err;
 	DOWNLINK_SEND_VISION_LAND(DefaultChannel, DefaultDevice, &guidance_v_zd_sp, &vision_div_const, &div_err, &vision_land_pgain, &ground_divergence);
 }
