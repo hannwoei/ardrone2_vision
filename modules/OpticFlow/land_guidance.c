@@ -62,6 +62,34 @@ struct LandGuidanceStruct land_guidance_data;
 #error "ALL control gains have to be positive!!!"
 #endif
 
+#ifndef VISION_PHI_PGAIN
+#define VISION_PHI_PGAIN 0
+#endif
+
+#ifndef VISION_PHI_DGAIN
+#define VISION_PHI_DGAIN 0
+#endif
+
+#ifndef VISION_THETA_PGAIN
+#define VISION_THETA_PGAIN 0
+#endif
+
+#ifndef VISION_THETA_DGAIN
+#define VISION_THETA_DGAIN 0
+#endif
+
+#ifndef VISION_LAND_PGAIN
+#define VISION_LAND_PGAIN 0
+#endif
+
+#ifndef VISION_LAND_DGAIN
+#define VISION_LAND_DGAIN 0
+#endif
+
+#ifndef VISION_DIV_CONST
+#define VISION_DIV_CONST 0
+#endif
+
 int32_t vision_phi_pgain;
 int32_t vision_phi_dgain;
 int32_t vision_theta_pgain;
@@ -134,11 +162,11 @@ void run_land_guidance_onvision(void)
 
   if(autopilot_mode == AP_MODE_HOVER_CLIMB)
   {
-	  run_opticflow_land();
+	  //run_opticflow_land();
   }
   else if(autopilot_mode == AP_MODE_ATTITUDE_Z_HOLD)
   {
-	  run_opticflow_hover();
+	  //run_opticflow_hover();
   }
 }
 

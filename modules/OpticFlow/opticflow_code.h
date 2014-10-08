@@ -17,11 +17,6 @@ extern float opt_angle_y_raw;
 
 extern float divergence;
 
-extern unsigned int stay_waypoint_3D;
-extern unsigned int land_distribution;
-
-extern bool_t train_dictionary;
-extern bool_t extract_distribution;
 extern bool_t snapshot;
 
 // Called by plugin
