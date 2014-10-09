@@ -35,7 +35,6 @@ unsigned int imgWidth, imgHeight;
 unsigned int verbose = 0;
 
 // Local variables
-//static unsigned char * img_uncertainty;
 //#define showframe 1
 unsigned char *prev_frame, *gray_frame, *prev_gray_frame;
 #ifdef showframe
@@ -51,7 +50,6 @@ unsigned int buf_point = 0;
 unsigned int buf_point_camh = 0;
 
 int *x, *y, *new_x, *new_y, *status, *dx, *dy, *dx_scaled, *dy_scaled, *n_inlier_minu, *n_inlier_minv, *active;
-float divergence, new_divergence;
 int error_corner, error_opticflow, mark_points;
 
 // Corner Detection
@@ -148,13 +146,6 @@ void my_plugin_init(void)
 	status = (int *) calloc(MAX_COUNT,sizeof(int));
 	dx = (int *) calloc(MAX_COUNT,sizeof(int));
 	dy = (int *) calloc(MAX_COUNT,sizeof(int));
-	dx_scaled = (int *) calloc(MAX_COUNT,sizeof(int));
-	dy_scaled = (int *) calloc(MAX_COUNT,sizeof(int));
-	n_inlier_minu = (int *)calloc(1,sizeof(int));
-	n_inlier_minv = (int *)calloc(1,sizeof(int));
-
-	divergence = 0.0;
-	new_divergence = 0.0;
 
 	// snapshot
 	i_frame = 0;

@@ -30,8 +30,7 @@ $(TARGET).CXXFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -D__USE
 
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
-#$(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code_new.c
-$(TARGET).srcs += $(VISION_MODULE_FOLDER)/land_guidance.c
+$(TARGET).srcs += $(VISION_MODULE_FOLDER)/hover_stabilization.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/optic_flow_gdc.c
 <!--$(TARGET).srcs += $(DIR_CV)/opticflow/fastRosten.c-->
 $(TARGET).srcs += $(DIR_CV)/opticflow/fast12/fastRosten.c

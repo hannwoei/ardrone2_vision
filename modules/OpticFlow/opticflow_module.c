@@ -24,7 +24,7 @@
 #include "opticflow_module.h"
 
 // Navigate Based On Vision
-#include "land_guidance.h"
+#include "hover_stabilization.h"
 
 // Paparazzi State: Attitude -> Vision
 #include "state.h" // for attitude
@@ -64,7 +64,7 @@ void opticflow_module_init(void) {
 	opticflow_module_start();
 
   // Navigation Code Initialization
-  init_land_guidance();
+  init_hover_stabilization_onvision();
 
   // FPS
   FPS = 0.0;
@@ -82,7 +82,7 @@ void opticflow_module_run(void) {
   if (computervision_thread_has_results)
   {
     computervision_thread_has_results = 0;
-    run_land_guidance_onvision();
+    run_hover_stabilization_onvision();
   }
 }
 
