@@ -19,6 +19,8 @@ extern float divergence;
 
 extern bool_t snapshot;
 
+extern int32_t fast_tune;
+
 // Called by plugin
 void my_plugin_init(void);
 void my_plugin_run(unsigned char *frame);

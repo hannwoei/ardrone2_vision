@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +6,7 @@
 #include "opticflow/optic_flow_gdc.h"
 #include "trig.h"
 //#include "opticflow/fastRosten.h"
+#include "opticflow/fast12/fastRosten.h"
 #include "opticflow_module.h"
 
 // Own Header
@@ -33,53 +33,49 @@
 // Settable by pluging
 unsigned int imgWidth, imgHeight;
 unsigned int verbose = 0;
+//#define showframe 1
 
 // Local variables
-//#define showframe 1
-unsigned char *prev_frame, *gray_frame, *prev_gray_frame;
+unsigned char *prev_frame, *gray_frame;
 #ifdef showframe
 unsigned char *copy_frame;
 #endif
 
 int old_img_init;
 
-int tot_x, tot_y, x_buf[24], y_buf[24], opt_trans_x_buf[32], opt_trans_y_buf[32];
-float opt_angle_x_raw, opt_angle_y_raw, x_avg, y_avg, camh_buf[24], cam_h_med;
+float OFx, OFy, dx_sum, dy_sum;
 
-unsigned int buf_point = 0;
-unsigned int buf_point_camh = 0;
+int *x, *y, *new_x, *new_y, *status, *dx, *dy;
+int error_opticflow;
 
-int *x, *y, *new_x, *new_y, *status, *dx, *dy, *dx_scaled, *dy_scaled, *n_inlier_minu, *n_inlier_minv, *active;
-int error_corner, error_opticflow, mark_points;
+#define PI 3.14159265359
+#define FOV_H 0.67020643276 //(38.4/180*PI);
+#define FOV_W 0.89360857702 //(51.2/180*PI);
 
 // Corner Detection
+int32_t fast_tune;
 int count = 0;
 int max_count = 25;
 int flow_point_size = 0;
 #define MAX_COUNT 150	// Maximum number of flow points
-flowPoint flow_points[MAX_COUNT];
-detectedPoint detected_points0[MAX_COUNT];
-detectedPoint detected_points1[MAX_COUNT];
-detectedPoint swap_points[MAX_COUNT];
+//flowPoint flow_points[MAX_COUNT];
+//detectedPoint detected_points0[MAX_COUNT];
+//detectedPoint detected_points1[MAX_COUNT];
+//detectedPoint swap_points[MAX_COUNT];
 
 // Flow Derotation
 /*
  * 1 deg = (2*arctan(0.5*imW/f))/FOV = xDerotate = yDerotate
  * FOVx = 50 deg, FOVy = 38 deg, imgW = 320, imgH = 240, Fx = 343.1211, Fy = 348.5053
- * TODO: validate data as F is computed from FOV so xDerotate = yDerotate = 1
  */
-#define xDerotate 1.000000019
-#define yDerotate 1.000000014
-unsigned int att_buf_point = 0;
 
-float curr_pitch, curr_roll, curr_yaw, prev_pitch, prev_roll, prev_yaw;
-float cam_h, prev_cam_h, diff_roll, diff_pitch, diff_roll_buf[12], diff_pitch_buf[12], opt_trans_x, opt_trans_y;
+float curr_pitch, curr_roll, prev_pitch, prev_roll;
+float cam_h, diff_roll, diff_pitch, OFx_trans, OFy_trans;
 
 // Lateral Velocity Computation
 #define Fx_ARdrone 343.1211
 #define Fy_ARdrone 348.5053
-float Velx, Vely, Velz, Velz_buf[12];
-unsigned int Velz_buf_point = 0;
+float Velx, Vely;
 
 // snapshot
 char filename[100];
@@ -88,6 +84,10 @@ bool_t snapshot;
 
 #ifndef VISION_SNAPSHOT
 #define VISION_SNAPSHOT FALSE
+#endif
+
+#ifndef VISION_FAST_THRES
+#define VISION_FAST_THRES 15
 #endif
 
 // Compute body velocities
@@ -101,43 +101,11 @@ void my_plugin_init(void)
 
 	// Init variables
 	gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
-	prev_gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
 	prev_frame = (unsigned char *) calloc(imgWidth*imgHeight*2,sizeof(unsigned char));
 #ifdef showframe
 	copy_frame = (unsigned char *) calloc(imgWidth*imgHeight*2,sizeof(unsigned char));
 #endif
 	old_img_init = 1;
-
-	tot_x = 0;
-	tot_y = 0;
-	x_avg = 0.0;
-	y_avg = 0.0;
-	opt_angle_x_raw = 0.0;
-	opt_angle_y_raw = 0,0;
-
-	diff_roll = 0.0;
-	diff_pitch = 0.0;
-	cam_h = 0.0;
-	prev_cam_h = 0.0;
-	prev_pitch = 0.0;
-	prev_roll = 0.0;
-	prev_yaw = 0.0;
-	curr_pitch = 0.0;
-	curr_roll = 0.0;
-	curr_yaw = 0.0;
-	opt_trans_x = 0.0;
-	opt_trans_y = 0.0;
-
-	cam_h_med = 0.0;
-
-	Velx = 0.0;
-	Vely = 0.0;
-	Velz = 0.0;
-
-	opt_angle_x_raw = 0;
-	opt_angle_y_raw = 0;
-
-	mark_points = 0;
 
 	x = (int *) calloc(MAX_COUNT,sizeof(int));
 	new_x = (int *) calloc(MAX_COUNT,sizeof(int));
@@ -147,10 +115,28 @@ void my_plugin_init(void)
 	dx = (int *) calloc(MAX_COUNT,sizeof(int));
 	dy = (int *) calloc(MAX_COUNT,sizeof(int));
 
+	OFx = 0.0;
+	OFy = 0.0;
+	dx_sum = 0.0;
+	dy_sum = 0.0;
+
+	diff_roll = 0.0;
+	diff_pitch = 0.0;
+	cam_h = 0.0;
+	prev_pitch = 0.0;
+	prev_roll = 0.0;
+	curr_pitch = 0.0;
+	curr_roll = 0.0;
+	OFx_trans = 0.0;
+	OFy_trans = 0.0;
+
+	Velx = 0.0;
+	Vely = 0.0;
+
 	// snapshot
 	i_frame = 0;
 	snapshot = VISION_SNAPSHOT;
-
+	fast_tune = VISION_FAST_THRES;
 }
 
 void my_plugin_run(unsigned char *frame)
@@ -170,18 +156,6 @@ void my_plugin_run(unsigned char *frame)
 	// Additional information from other sensors
 	// ***********************************************************************************************************************
 
-//#if USE_SONAR
-//		cam_h = ins_impl.sonar_z;
-//#else
-//		cam_h = 1;
-//		prev_cam_h = 1;
-//#endif
-//
-//		camh_buf[buf_point_camh] = cam_h;
-//		buf_point_camh = (buf_point_camh+1) %11;
-//		quick_sort(camh_buf,11);
-//		cam_h_med = camh_buf[6];
-
     // Compute body velocities from ENU
     V_Ned.x = stateGetSpeedNed_f()->x;
     V_Ned.y = stateGetSpeedNed_f()->y;
@@ -198,134 +172,106 @@ void my_plugin_run(unsigned char *frame)
 	// (1) possibly find new points - keeping possible old ones (normal cv methods / efficient point finding / active corners)
 	// ***********************************************************************************************************************
 
-    int ALWAYS_NEW_POINTS = 1;
+//    int ALWAYS_NEW_POINTS = 1;
+//
+//    if(ALWAYS_NEW_POINTS)
+//    {
+//    	// Clear corners
+//    	// memset(flow_points,0,sizeof(flowPoint)*flow_point_size);
+//    	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
+//    }
+//    else
+//    {
+//    	int threshold_n_points = 25; //25
+//    	if(flow_point_size < threshold_n_points)
+//    	{
+//        	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
+//    	}
+//    }
+	// FAST corner:
+	int fast_threshold = fast_tune; //10
+	xyFAST* pnts_fast;
 
-    if(ALWAYS_NEW_POINTS)
-    {
-    	// Clear corners
-    	// memset(flow_points,0,sizeof(flowPoint)*flow_point_size);
-    	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
-    }
-    else
-    {
-    	int threshold_n_points = 25; //25
-    	if(flow_point_size < threshold_n_points)
-    	{
-        	findPoints(gray_frame, frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0);
-    	}
-    }
+	CvtYUYV2Gray(gray_frame, frame, imgWidth, imgHeight); // convert to gray scaled image is a must for FAST corner
 
+	pnts_fast = fast12_detect((const byte*)gray_frame, imgWidth, imgHeight, imgWidth, fast_threshold, &count);
+
+	if(count > max_count) count = max_count;
+
+	for(int i = 0; i < count; i++)
+	{
+		x[i] = pnts_fast[i].x;
+		y[i] = pnts_fast[i].y;
+	}
+
+	free(pnts_fast);
 	// **********************************************************************************************************************
 	// (2) track the points to the new image, possibly using external information (TTC, known lateral / rotational movements)
 	// **********************************************************************************************************************
-    trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, detected_points1, x, y, new_x, new_y, dx, dy, status);
+//    trackPoints(frame, prev_frame, imgWidth, imgHeight, &count, max_count, MAX_COUNT, flow_points, &flow_point_size, detected_points0, detected_points1, x, y, new_x, new_y, dx, dy, status);
+
+	error_opticflow = opticFlowLK(frame, prev_frame, x, y, count, imgWidth, imgHeight, new_x, new_y, status, 5, MAX_COUNT);
 
 #ifdef showframe
-    	showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
+	showFlow(frame, x, y, status, count, new_x, new_y, imgWidth, imgHeight);
 #endif
-		for (int i=0; i<count;i++)
+	dx_sum = 0.0;
+	dy_sum = 0.0;
+	for (int i=0; i<count;i++)
+	{
+//			dx[i] = flow_points[i].dx;
+//			dy[i] = flow_points[i].dy;
+		dx[i] = new_x[i] - x[i];
+		dy[i] = new_y[i] - y[i];
+		dx_sum += (float) dx[i];
+		dy_sum += (float) dy[i];
+	}
+	if(count)
+	{
+		dx_sum = dx_sum/count;
+		dy_sum = dy_sum/count;
+	}
+
+	// Flow Derotation
+	curr_pitch = stateGetNedToBodyEulers_f()->theta;
+	curr_roll = stateGetNedToBodyEulers_f()->phi;
+
+	diff_pitch = (curr_pitch - prev_pitch)*imgHeight/FOV_H;
+	diff_roll = (curr_roll - prev_roll)*imgWidth/FOV_W;
+
+	prev_pitch = curr_pitch;
+	prev_roll = curr_roll;
+
+	if(count)
+	{
+		OFx_trans = dx_sum - diff_roll;
+		OFy_trans = dy_sum - diff_pitch;
+
+		// avoid over-correlated flow
+		if((OFx_trans<=0) != (dx_sum<=0))
 		{
-			dx[i] = flow_points[i].dx;
-			dy[i] = flow_points[i].dy;
+			OFx_trans = 0;
+			OFy_trans = 0;
 		}
+	}
+	else
+	{
+		OFx_trans = dx_sum;
+		OFy_trans = dy_sum;
+	}
 
-//    	OFfilter(&opt_angle_x_raw, &opt_angle_y_raw, flow_points, count, 1);
-    	OFfilter(&opt_angle_x_raw, &opt_angle_y_raw, flow_points, count, 2);
-
-		curr_pitch = stateGetNedToBodyEulers_i()->theta*0.0139882;
-		curr_roll = stateGetNedToBodyEulers_i()->phi*0.0139882;
-		diff_pitch = (curr_pitch - prev_pitch);
-		diff_roll = (curr_roll - prev_roll);
-		prev_pitch = curr_pitch;
-		prev_roll = curr_roll;
-
-		// Flow Derotation
-	//		curr_pitch = stateGetNedToBodyEulers_i()->theta*0.0139882;
-	//		curr_roll = stateGetNedToBodyEulers_i()->phi*0.0139882;
-	//		curr_yaw = stateGetNedToBodyEulers_i()->psi*0.0139882;
-	//
-	//		diff_pitch = (curr_pitch - prev_pitch)/FPS*scaley*Fy_ARdrone*240/38.4;
-	//		diff_roll = (curr_roll - prev_roll)/FPS*scalex*Fx_ARdrone*320/51.2;
-	//
-	//		prev_pitch = curr_pitch;
-	//		prev_roll = curr_roll;
-	//		prev_yaw = curr_yaw;
-	//
-	//		opt_trans_x = opt_angle_x_raw - diff_roll;
-	//		opt_trans_y = opt_angle_y_raw - diff_pitch;
-	//
-	//
-	//		// Velocity Computation
-	#ifdef USE_SONAR
-			cam_h = ins_impl.sonar_z;
-	#else
-			cam_h = 1;
-//			prev_cam_h = 1;
-	#endif
-//			Velz = (cam_h-prev_cam_h)*FPS;
-//			prev_cam_h = cam_h;
-
-//			int velz_win = 6;
-//			Velz_buf[Velz_buf_point] = Velz;
-//			Velz_buf_point = (Velz_buf_point+1) %velz_win;
-//
-//			for (int i=0;i<velz_win;i++) {
-//				Velz+=Velz_buf[i]/velz_win;
-//			}
-
-			Velx = opt_angle_y_raw*cam_h*FPS/Fy_ARdrone;
-			Vely = -opt_angle_x_raw*cam_h*FPS/Fx_ARdrone;
-
-//			if(count)
-//			{
-//				Velx = opt_angle_x_raw*cam_h/Fx_ARdrone;
-//				Vely = opt_angle_y_raw*cam_h/Fy_ARdrone;
-//			}
-//			else
-//			{
-//				Velx = 0.0;
-//				Vely = 0.0;
-//			}
-
-
-			// Kalman fusion: Optic flow and Accelerometers
-	//	    ACCELS_FLOAT_OF_BFP(accel_update,imu.accel);
-	//	    rate_update.p = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->p);
-	//	    rate_update.q = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->q);
-	//	    rate_update.r = RATE_FLOAT_OF_BFP(stateGetBodyRates_i()->r);
-
-	//	    ACCELS_FLOAT_OF_BFP(accel_update,mean_accel);
-	//	    RATES_FLOAT_OF_BFP(rate_update,mean_rate);
-	//		INT_RATES_ZERO(mean_rate);
-	//		INT32_VECT3_ZERO(mean_accel);
-	//		count_input = 0;
-
-	//		DOWNLINK_SEND_EKF_VISION_ACCEL(DefaultChannel, DefaultDevice, &accel_update.x, &accel_update.y, &accel_update.z, &rate_update.p, &rate_update.q, &rate_update.r, &curr_roll, &curr_pitch, &curr_yaw, &opt_angle_x_raw, &opt_angle_y_raw, &opt_trans_x, &opt_trans_y, &Velz, &cam_h, &FPS);
+	OFfilter2(&OFx, &OFy, OFx_trans, OFy_trans, count, 2);
 
 	// Velocity Computation
+	#ifdef USE_SONAR
+		cam_h = ins_impl.sonar_z;
+	#else
+		cam_h = 1;
+	#endif
 
-//	Velx = opt_angle_y_raw*cam_h_med/Fy_ARdrone*FPS;
-//	Vely = -opt_angle_x_raw*cam_h_med/Fx_ARdrone*FPS;
-//
-//	OF_speed.x = (int) (Velx*(1<<(INT32_SPEED_FRAC)));
-//	OF_speed.y = (int) (Vely*(1<<(INT32_SPEED_FRAC)));
+	Velx = OFy*cam_h*FPS/Fy_ARdrone;
+	Vely = -OFx*cam_h*FPS/Fx_ARdrone;
 
-	//stateSetSpeedNed_i(&OF_speed);
-
-	/*
-	 * comment out "stateSetSpeedNed_i(&ins_impl.ltp_speed);" in ins_int.c if optic flow velocities are used to set the speeds in the states
-	 * // copy position and speed to state interface
-		static void ins_ned_to_state(void) {
-		  stateSetPositionNed_i(&ins_impl.ltp_pos);
-		  //stateSetSpeedNed_i(&ins_impl.ltp_speed);
-		  stateSetAccelNed_i(&ins_impl.ltp_accel);
-
-		#if defined SITL && USE_NPS
-		  if (nps_bypass_ins)
-			sim_overwrite_ins();
-		#endif
-}
-	 */
 
 	if(snapshot)
 	{
@@ -345,13 +291,13 @@ void my_plugin_run(unsigned char *frame)
     memcpy(prev_frame,frame,imgHeight*imgWidth*2);
 #endif
 
-	for (int i=0;i<count;i++)
-	{
-		swap_points[i] = detected_points0[i];
-		detected_points0[i] = detected_points1[i];
-		detected_points1[i] = swap_points[i];
-	}
-	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &opt_angle_x_raw, &opt_angle_y_raw, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &count);
+//	for (int i=0;i<count;i++)
+//	{
+//		swap_points[i] = detected_points0[i];
+//		detected_points0[i] = detected_points1[i];
+//		detected_points1[i] = swap_points[i];
+//	}
+	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &count);
 
 }
 
