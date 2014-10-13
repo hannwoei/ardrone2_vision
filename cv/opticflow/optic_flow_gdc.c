@@ -2479,7 +2479,11 @@ unsigned int OF_buf_point = 0;
 unsigned int OF_buf_point2 = 0;
 float tot_x, tot_y, x_avg, y_avg, x_buf[24], y_buf[24], x_buf2[24], y_buf2[24];
 
-void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint flow_points[], int count, int OF_FilterType)
+#ifdef FLOW_DEROTATE
+void OFfilter(float *OFx, float *OFy, float * struct flowPoint flow_points[], int count, int OF_FilterType, float diff_roll, float diff_pitch)
+#else
+void OFfilter(float *OFx, float *OFy, struct flowPoint flow_points[], int count, int OF_FilterType)
+#endif
 {
 	tot_x = 0.0;
 	tot_y = 0.0;
@@ -2488,6 +2492,12 @@ void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint f
 	{
 		tot_x = tot_x + (float) flow_points[i].dx;
 		tot_y = tot_y + (float) flow_points[i].dy;
+		tot_x = tot_x/count;
+		tot_y = tot_y/count;
+
+#ifdef FLOW_DEROTATE
+
+#endif
 	}
 
 	if(OF_FilterType == 1) //1. moving average 2. moving median
@@ -2498,8 +2508,8 @@ void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint f
 
 		if(count)
 		{
-			x_buf[OF_buf_point] = tot_x/count;
-			y_buf[OF_buf_point] = tot_y/count;
+			x_buf[OF_buf_point] = tot_x;
+			y_buf[OF_buf_point] = tot_y;
 		}
 		else
 		{
@@ -2513,16 +2523,16 @@ void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint f
 			y_avg+=y_buf[i]*0.2;
 		}
 
-		*opt_angle_x_raw = x_avg;
-		*opt_angle_y_raw = y_avg;
+		*OFx = x_avg;
+		*OFy = y_avg;
 
 	}
 	else if(OF_FilterType == 2)
 	{
 		if(count)
 		{
-			x_buf2[OF_buf_point2] = tot_x/count;
-			y_buf2[OF_buf_point2] = tot_y/count;
+			x_buf2[OF_buf_point2] = tot_x;
+			y_buf2[OF_buf_point2] = tot_y;
 		}
 		else
 		{
@@ -2534,8 +2544,66 @@ void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint f
 		quick_sort(x_buf2,11);
 		quick_sort(y_buf2,11);
 
-		*opt_angle_x_raw = x_buf2[6];
-		*opt_angle_y_raw = y_buf2[6];
+		*OFx = x_buf2[6];
+		*OFy = y_buf2[6];
+	}
+	else
+	{
+		printf("no filter type selected!\n");
+	}
+
+
+}
+
+void OFfilter2(float *OFx, float *OFy, float dx, float dy, int count, int OF_FilterType)
+{
+
+	if(OF_FilterType == 1) //1. moving average 2. moving median
+	{
+
+		x_avg = 0.0;
+		y_avg = 0.0;
+
+		if(count)
+		{
+			x_buf[OF_buf_point] = dx;
+			y_buf[OF_buf_point] = dy;
+		}
+		else
+		{
+			x_buf[OF_buf_point] = 0.0;
+			y_buf[OF_buf_point] = 0.0;
+		}
+		OF_buf_point = (OF_buf_point+1) %5;
+
+		for (int i=0;i<5;i++) {
+			x_avg+=x_buf[i]*0.2;
+			y_avg+=y_buf[i]*0.2;
+		}
+
+		*OFx = x_avg;
+		*OFy = y_avg;
+
+	}
+	else if(OF_FilterType == 2)
+	{
+		if(count)
+		{
+			x_buf2[OF_buf_point2] = dx;
+			y_buf2[OF_buf_point2] = dy;
+		}
+		else
+		{
+			x_buf2[OF_buf_point2] = 0.0;
+			y_buf2[OF_buf_point2] = 0.0;
+		}
+		OF_buf_point2 = (OF_buf_point2+1) %11;
+
+		quick_sort(x_buf2,11);
+		quick_sort(y_buf2,11);
+
+		*OFx = x_buf2[6];
+		*OFy = y_buf2[6];
 	}
 	else
 	{
