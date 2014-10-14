@@ -31,11 +31,10 @@
 #include "opticflow_code.h"
 
 // Interact with navigation
-//#include "navigation.h"
 #include "stabilization.h"
 #include "firmwares/rotorcraft/guidance/guidance_v.h"
+//#include "firmwares/rotorcraft/stabilization/stabilization_attitude_quat_int.h"
 #include "autopilot.h"
-#include "subsystems/nav.h"
 
 // Know waypoint numbers and blocks
 //#include "generated/flight_plan.h"
@@ -202,7 +201,7 @@ void run_opticflow_hover(void)
 	  OF_dx_prev = OF_dx;
 	  OF_dy_prev = OF_dy;
 
-	  stabilization_attitude_set_rpy_setpoint_i(&cmd_euler);
+//	  stabilization_attitude_set_rpy_setpoint_i(&cmd_euler);
 //	  stabilization_attitude_set_earth_cmd_i(&cmd_euler2, 0);
 
 	 DOWNLINK_SEND_VISION_STABILIZATION(DefaultChannel, DefaultDevice, &stateGetPositionEnu_i()->z, &ins_impl.baro_z, &cam_h, &stateGetNedToBodyEulers_i()->phi, &stateGetNedToBodyEulers_i()->theta, &stateGetNedToBodyEulers_i()->psi, &cmd_euler.phi, &cmd_euler.theta, &OF_dx, &OF_dy, &dt_FPS);
@@ -249,7 +248,7 @@ void run_opticflow_land(void)
 		off_count = 0;
 	}
 	// Land if the drone is close to ground after 3 seconds touchdown assuming 60fps
-	if(off_count > 180) NavKillThrottle();
+//	if(off_count > 180) NavKillThrottle();
 	div_err_prev = div_err;
 	DOWNLINK_SEND_VISION_LAND(DefaultChannel, DefaultDevice, &guidance_v_zd_sp, &vision_div_const, &div_err, &vision_land_pgain, &ground_divergence);
 }
