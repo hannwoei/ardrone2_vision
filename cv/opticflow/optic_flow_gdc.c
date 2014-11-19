@@ -6,7 +6,7 @@
 #include "defs_and_types.h"
 #include "nrutil.h"
 //#include "opticflow/fastRosten.h"
-#include "opticflow/fast12/fastRosten.h"
+#include "opticflow/fast9/fastRosten.h"
 #include "../../modules/OpticFlow/opticflow_module.h"
 
 #define int_index(x,y) (y * IMG_WIDTH + x)
@@ -970,6 +970,104 @@ void getSubPixel(int* Patch, unsigned char* frame_buf, int center_x, int center_
   return;
 }
 
+void getSubPixel_gray(int* Patch, unsigned char* frame_buf, int center_x, int center_y, int half_window_size, int subpixel_factor)
+{
+  int x, y, x_0, y_0, x_0_or, y_0_or, i, j, window_size, alpha_x, alpha_y, max_x, max_y;
+  //int printed, limit;
+  unsigned int ix1, ix2, Y;
+  window_size = half_window_size * 2 + 1;
+  max_x = (IMG_WIDTH-1)*subpixel_factor;
+  max_y = (IMG_HEIGHT-1)*subpixel_factor;
+  //printed = 0; limit = 4;
+
+  for(i = 0; i < window_size; i++)
+  {
+    for(j = 0; j < window_size; j++)
+    {
+      // index for this position in the patch:
+      ix1 = (j * window_size + i);
+
+      // determine subpixel coordinates of the current pixel:
+      x = center_x + (i - half_window_size) * subpixel_factor;
+      if(x < 0) x = 0;
+      if(x > max_x) x = max_x;
+      y = center_y + (j - half_window_size) * subpixel_factor;
+      if(y < 0) y = 0;
+      if(y > max_y) y = max_y;
+      // pixel to the top left:
+      x_0_or = (x / subpixel_factor);
+      x_0 = x_0_or * subpixel_factor;
+      y_0_or = (y / subpixel_factor);
+      y_0 = y_0_or * subpixel_factor;
+      /*if(printed < limit)
+			{
+				printf("x_0_or = %d, y_0_or = %d;\n\r", x_0_or, y_0_or);
+				printf("x_0 = %d, y_0 = %d\n\r");
+				printed++;
+			}*/
+
+
+      if(x == x_0 && y == y_0)
+      {
+        // simply copy the pixel:
+//        ix2 = uint_index(x_0_or, y_0_or);
+//          Y = ((unsigned int)frame_buf[ix2+1] + (unsigned int)frame_buf[ix2+3]) >> 1;
+    	ix2 = y_0_or * IMG_WIDTH + x_0_or;
+        Y = (unsigned int)frame_buf[ix2+1];
+        Patch[ix1] = (int) Y;
+      }
+      else
+      {
+        // blending according to how far the subpixel coordinates are from the pixel coordinates
+        alpha_x = (x - x_0);
+        alpha_y = (y - y_0);
+
+        // the patch pixel is a blend from the four surrounding pixels:
+    	ix2 = y_0_or * IMG_WIDTH + x_0_or;
+        Y = (unsigned int)frame_buf[ix2+1];
+//        ix2 = uint_index(x_0_or, y_0_or);
+//        Y = ((unsigned int)frame_buf[ix2+1] + (unsigned int)frame_buf[ix2+3]) >> 1;
+        Patch[ix1] = (subpixel_factor - alpha_x) * (subpixel_factor - alpha_y) * ((int) Y);
+
+    	ix2 = y_0_or * IMG_WIDTH + (x_0_or + 1);
+        Y = (unsigned int)frame_buf[ix2+1];
+//        ix2 = uint_index((x_0_or+1), y_0_or);
+//        Y = ((unsigned int)frame_buf[ix2+1] + (unsigned int)frame_buf[ix2+3]) >> 1;
+        //if(printed < limit) printf("subpixel: TR = %d\n\r", Y);
+        Patch[ix1] += alpha_x * (subpixel_factor - alpha_y) * ((int) Y);
+
+    	ix2 = (y_0_or + 1) * IMG_WIDTH + x_0_or;
+        Y = (unsigned int)frame_buf[ix2+1];
+//        ix2 = uint_index(x_0_or, (y_0_or+1));
+//        Y = ((unsigned int)frame_buf[ix2+1] + (unsigned int)frame_buf[ix2+3]) >> 1;
+        //if(printed < limit) printf("subpixel: BL = %d\n\r", Y);
+        Patch[ix1] += (subpixel_factor - alpha_x) * alpha_y * ((int) Y);
+
+    	ix2 = (y_0_or + 1) * IMG_WIDTH + (x_0_or + 1);
+        Y = (unsigned int)frame_buf[ix2+1];
+//        ix2 = uint_index((x_0_or+1), (y_0_or+1));
+//        Y = ((unsigned int)frame_buf[ix2+1] + (unsigned int)frame_buf[ix2+3]) >> 1;
+        //if(printed < limit) printf("subpixel: BR = %d\n\r", Y);
+        Patch[ix1] += alpha_x * alpha_y * ((int) Y);
+
+        // normalize patch value
+        Patch[ix1] /= (subpixel_factor * subpixel_factor);
+
+        /*if(printed < limit)
+				{
+
+					printf("alpha_x = %d, alpha_y = %d, x_0 = %d, y_0 = %d, x = %d, y = %d, Patch[ix1] = %d\n\r", alpha_x, alpha_y, x_0, y_0, x, y, Patch[ix1]);
+					// printed++;
+				}
+         */
+
+      }
+    }
+  }
+
+  return;
+}
+
 void getGradientPatch(int* Patch, int* DX, int* DY, int half_window_size)
 {
   unsigned int ix1, ix2;
@@ -990,13 +1088,15 @@ void getGradientPatch(int* Patch, int* DX, int* DY, int half_window_size)
       Y1 = Patch[ix1];
       ix1 = (unsigned int) (y * padded_patch_size + x+1);
       Y2 = Patch[ix1];
-      DX[ix2] = Y2 - Y1;
+//      DX[ix2] = Y2 - Y1;
+      DX[ix2] = (Y2 - Y1)/2;
 
       ix1 = (unsigned int) ((y-1) * padded_patch_size + x);
       Y1 = Patch[ix1];
       ix1 = (unsigned int) ((y+1) * padded_patch_size + x);
       Y2 = Patch[ix1];
-      DY[ix2] = Y2 - Y1;
+//      DY[ix2] = Y2 - Y1;
+      DY[ix2] = (Y2 - Y1)/2;
 
       /*if(printed < 1 && DX[ix2] > 0)
 			{
@@ -1105,198 +1205,1020 @@ int calculateError(int* ImC, int width, int height)
   return error;
 }
 
+// only for UYVY image, not grayscale
 int opticFlowLK(unsigned char * new_image_buf, unsigned char * old_image_buf, int* p_x, int* p_y, int n_found_points, int imW, int imH, int* new_x, int* new_y, int* status, int half_window_size, int max_iterations)
 {
-  // A straightforward one-level implementation of Lucas-Kanade.
-  // For all points:
-  // (1) determine the subpixel neighborhood in the old image
-  // (2) get the x- and y- gradients
-  // (3) determine the 'G'-matrix [sum(Axx) sum(Axy); sum(Axy) sum(Ayy)], where sum is over the window
-  // (4) iterate over taking steps in the image to minimize the error:
-  //     [a] get the subpixel neighborhood in the new image
-  //     [b] determine the image difference between the two neighborhoods
-  //     [c] calculate the 'b'-vector
-  //     [d] calculate the additional flow step and possibly terminate the iteration
-  int p, subpixel_factor, x, y, it, step_threshold, step_x, step_y, v_x, v_y, Det;
-  int b_x, b_y, patch_size, padded_patch_size, error, step_size;
-  unsigned int ix1, ix2;
-  int* I_padded_neighborhood; int* I_neighborhood; int* J_neighborhood;
-  int* DX; int* DY; int* ImDiff; int* IDDX; int* IDDY;
-  int G[4];
-  int error_threshold;
+	// A straightforward one-level implementation of Lucas-Kanade.
+	// For all points:
+	// (1) determine the subpixel neighborhood in the old image
+	// (2) get the x- and y- gradients
+	// (3) determine the 'G'-matrix [sum(Axx) sum(Axy); sum(Axy) sum(Ayy)], where sum is over the window
+	// (4) iterate over taking steps in the image to minimize the error:
+	//     [a] get the subpixel neighborhood in the new image
+	//     [b] determine the image difference between the two neighborhoods
+	//     [c] calculate the 'b'-vector
+	//     [d] calculate the additional flow step and possibly terminate the iteration
+	int p, subpixel_factor, x, y, it, step_threshold, step_x, step_y, v_x, v_y, Det;
+	int b_x, b_y, patch_size, padded_patch_size, error, step_size;
+	unsigned int ix1, ix2;
+	int* I_padded_neighborhood; int* I_neighborhood; int* J_neighborhood;
+	int* DX; int* DY; int* ImDiff; int* IDDX; int* IDDY;
+	int G[4];
+	int error_threshold;
 
-  // set the image width and height
-  IMG_WIDTH = imW;
-  IMG_HEIGHT = imH;
-  // spatial resolution of flow is 1 / subpixel_factor
-  subpixel_factor = 10;
-  // determine patch sizes and initialize neighborhoods
-  patch_size = (2*half_window_size + 1);
-  error_threshold = (25 * 25) * (patch_size * patch_size);
+	// set the image width and height
+	IMG_WIDTH = imW;
+	IMG_HEIGHT = imH;
+	// spatial resolution of flow is 1 / subpixel_factor
+	subpixel_factor = 10;
+	// determine patch sizes and initialize neighborhoods
+	patch_size = (2*half_window_size + 1);
+	error_threshold = (25 * 25) * (patch_size * patch_size);
 
-  padded_patch_size = (2*half_window_size + 3);
-  I_padded_neighborhood = (int *) malloc(padded_patch_size * padded_patch_size * sizeof(int));
-  I_neighborhood = (int *) malloc(patch_size * patch_size * sizeof(int));
-  J_neighborhood = (int *) malloc(patch_size * patch_size * sizeof(int));
-  if(I_padded_neighborhood == 0 || I_neighborhood == 0 || J_neighborhood == 0)
-    return NO_MEMORY;
-  DX = (int *) malloc(patch_size * patch_size * sizeof(int));
-  DY = (int *) malloc(patch_size * patch_size * sizeof(int));
-  IDDX = (int *) malloc(patch_size * patch_size * sizeof(int));
-  IDDY = (int *) malloc(patch_size * patch_size * sizeof(int));
-  ImDiff = (int *) malloc(patch_size * patch_size * sizeof(int));
-  if(DX == 0 || DY == 0 || ImDiff == 0 || IDDX == 0 || IDDY == 0)
-    return NO_MEMORY;
+	padded_patch_size = (2*half_window_size + 3);
+	I_padded_neighborhood = (int *) malloc(padded_patch_size * padded_patch_size * sizeof(int));
+	I_neighborhood = (int *) malloc(patch_size * patch_size * sizeof(int));
+	J_neighborhood = (int *) malloc(patch_size * patch_size * sizeof(int));
+	if(I_padded_neighborhood == 0 || I_neighborhood == 0 || J_neighborhood == 0)
+		return NO_MEMORY;
 
-  for(p = 0; p < n_found_points; p++)
-  {
-    //printf("*** NEW POINT ***\n\r");
-    // status: point is not yet lost:
-    status[p] = 1;
+	DX = (int *) malloc(patch_size * patch_size * sizeof(int));
+	DY = (int *) malloc(patch_size * patch_size * sizeof(int));
+	IDDX = (int *) malloc(patch_size * patch_size * sizeof(int));
+	IDDY = (int *) malloc(patch_size * patch_size * sizeof(int));
+	ImDiff = (int *) malloc(patch_size * patch_size * sizeof(int));
+	if(DX == 0 || DY == 0 || ImDiff == 0 || IDDX == 0 || IDDY == 0)
+		return NO_MEMORY;
 
-    //printf("Normal coordinate: (%d,%d)\n\r", p_x[p], p_y[p]);
-    // We want to be able to take steps in the image of 1 / subpixel_factor:
-    p_x[p] *= subpixel_factor;
-    p_y[p] *= subpixel_factor;
-    //printf("Subpixel coordinate: (%d,%d)\n\r", p_x[p], p_y[p]);
+	for(p = 0; p < n_found_points; p++)
+	{
+		//printf("*** NEW POINT ***\n\r");
+		// status: point is not yet lost:
+		status[p] = 1;
 
-    // if the pixel is outside the ROI in the image, do not track it:
-    if(!(p_x[p] > ((half_window_size+1) * subpixel_factor) && p_x[p] < ((int)IMG_WIDTH-half_window_size) * subpixel_factor && p_y[p] > ((half_window_size+1) * subpixel_factor) && p_y[p] < ((int)IMG_HEIGHT-half_window_size)*subpixel_factor))
-    {
-      //printf("Outside of ROI\n\r");
-      status[p] = 0;
-    }
+		//printf("Normal coordinate: (%d,%d)\n\r", p_x[p], p_y[p]);
+		// We want to be able to take steps in the image of 1 / subpixel_factor:
+		p_x[p] *= subpixel_factor;
+		p_y[p] *= subpixel_factor;
+		//printf("Subpixel coordinate: (%d,%d)\n\r", p_x[p], p_y[p]);
+
+		// if the pixel is outside the ROI in the image, do not track it:
+		if(!(p_x[p] > ((half_window_size+1) * subpixel_factor) && p_x[p] < (IMG_WIDTH-half_window_size) * subpixel_factor && p_y[p] > ((half_window_size+1) * subpixel_factor) && p_y[p] < (IMG_HEIGHT-half_window_size)*subpixel_factor))
+		{
+//			printf("Outside of ROI, P1[%d,%d]\n\r",p_x[p],p_y[p]);
+			status[p] = 0;
+		}
+
+		// (1) determine the subpixel neighborhood in the old image
+		// we determine a padded neighborhood with the aim of subsequent gradient processing:
+		getSubPixel_gray(I_padded_neighborhood, old_image_buf, p_x[p], p_y[p], half_window_size+1, subpixel_factor);
+
+		// Also get the original-sized neighborhood
+		for(x = 1; x < padded_patch_size - 1; x++)
+		{
+		  for(y = 1; y < padded_patch_size - 1; y++)
+		  {
+			ix1 = (y * padded_patch_size + x);
+			ix2 = ((y-1) * patch_size + (x-1));
+			I_neighborhood[ix2] = I_padded_neighborhood[ix1];
+		  }
+		}
+
+		// (2) get the x- and y- gradients
+		getGradientPatch(I_padded_neighborhood, DX, DY, half_window_size);
+
+		// (3) determine the 'G'-matrix [sum(Axx) sum(Axy); sum(Axy) sum(Ayy)], where sum is over the window
+		error = calculateG(G, DX, DY, half_window_size);
+		if(error == NO_MEMORY) return NO_MEMORY;
+
+		for(it = 0; it < 4; it++)
+		{
+	//		printf("G[%d] = %d\n\r", it, G[it]);
+			G[it] /= 255; // to keep values in range
+	//		printf("G[%d] = %d\n\r", it, G[it]);
+		}
+		// calculate G's determinant:
+		Det = G[0] * G[3] - G[1] * G[2];
+		//printf("Det = %d\n\r", Det);
+		Det = Det / subpixel_factor; // so that the steps will be expressed in subpixel units
+		//printf("Det = %d\n\r", Det);
+		if(Det < 1)
+		{
+			status[p] = 0;
+//			printf("irrevertible G\n");
+		}
+
+		// (4) iterate over taking steps in the image to minimize the error:
+		it = 0;
+		step_threshold = 2; // 0.2 as smallest step (L1)
+		v_x = 0;
+		v_y = 0;
+		step_x = step_threshold + 1;
+		step_y = step_threshold + 1;
+
+		while(status[p] == 1 && it < max_iterations && (abs(step_x) >= step_threshold || abs(step_y) >= step_threshold))
+		{
+		  //printf("it = %d, (p_x+v_x,p_y+v_y) = (%d,%d)\n\r", it, p_x[p]+v_x, p_y[p]+v_y);
+		  //printf("it = %d;", it);
+		  // if the pixel goes outside the ROI in the image, stop tracking:
+		  if(!(p_x[p]+v_x > ((half_window_size+1) * subpixel_factor) && p_x[p]+v_x < ((int)IMG_WIDTH-half_window_size) * subpixel_factor && p_y[p]+v_y > ((half_window_size+1) * subpixel_factor) && p_y[p]+v_y < ((int)IMG_HEIGHT-half_window_size)*subpixel_factor))
+		  {
+//			printf("Outside of ROI, P1[%d,%d]\n\r",p_x[p],p_y[p]);
+			status[p] = 0;
+			break;
+		  }
+
+		  //     [a] get the subpixel neighborhood in the new image
+		  // clear J:
+		  for(x = 0; x < patch_size; x++)
+		  {
+			for(y = 0; y < patch_size; y++)
+			{
+			  ix2 = (y * patch_size + x);
+			  J_neighborhood[ix2] = 0;
+			}
+		  }
 
 
-    // (1) determine the subpixel neighborhood in the old image
-    // we determine a padded neighborhood with the aim of subsequent gradient processing:
-    getSubPixel(I_padded_neighborhood, old_image_buf, p_x[p], p_y[p], half_window_size+1, subpixel_factor);
-    // Also get the original-sized neighborhood
-    for(x = 1; x < padded_patch_size - 1; x++)
-    {
-      for(y = 1; y < padded_patch_size - 1; y++)
-      {
-        ix1 = (y * padded_patch_size + x);
-        ix2 = ((y-1) * patch_size + (x-1));
-        I_neighborhood[ix2] = I_padded_neighborhood[ix1];
-      }
-    }
+		  getSubPixel_gray(J_neighborhood, new_image_buf, p_x[p]+v_x, p_y[p]+v_y, half_window_size, subpixel_factor);
+		  //     [b] determine the image difference between the two neighborhoods
+		  //printf("I = ");
+		  //printIntMatrix(I_neighborhood, patch_size, patch_size);
+		  //printf("J = ");
+		  //printIntMatrix(J_neighborhood, patch_size, patch_size);
+		  //getSubPixel(J_neighborhood, new_image_buf, subpixel_factor * ((p_x[p]+v_x)/subpixel_factor), subpixel_factor * ((p_y[p]+v_y) / subpixel_factor), half_window_size, subpixel_factor);
+		  //printf("J2 = ");
+		  //printIntMatrix(J_neighborhood, patch_size, patch_size);
+		  //printf("figure(); subplot(1,2,1); imshow(I/255); subplot(1,2,2); imshow(J/255);\n\r");
+		  getImageDifference(I_neighborhood, J_neighborhood, ImDiff, patch_size, patch_size);
+		  //printf("ImDiff = ");
+		  //printIntMatrix(ImDiff, patch_size, patch_size);
+		  error = calculateError(ImDiff, patch_size, patch_size)/255;
 
-    // (2) get the x- and y- gradients
-    getGradientPatch(I_padded_neighborhood, DX, DY, half_window_size);
+//	      if(error > error_threshold) printf("error threshold\n");
+		  if(error > error_threshold && it > max_iterations / 2)
+		  {
+			status[p] = 0;
+//			printf("occlusion\n");
+			break;
+		  }
+		  //printf("error(%d) = %d;\n\r", it+1, error);
+		  //     [c] calculate the 'b'-vector
+		  //printf("DX = ");
+		  //printIntMatrix(DX, patch_size, patch_size);
+		  multiplyImages(ImDiff, DX, IDDX, patch_size, patch_size);
+		  //printf("IDDX = ");
+		  //printIntMatrix(IDDX, patch_size, patch_size);
+		  multiplyImages(ImDiff, DY, IDDY, patch_size, patch_size);
+		  //printf("DY = ");
+		  //printIntMatrix(DY, patch_size, patch_size);
+		  //printf("IDDY = ");
+		  //printIntMatrix(IDDY, patch_size, patch_size);
+		  //printf("figure(); subplot(2,3,1); imagesc(ImDiff); subplot(2,3,2); imagesc(DX); subplot(2,3,3); imagesc(DY);");
+		  //printf("subplot(2,3,4); imagesc(IDDY); subplot(2,3,5); imagesc(IDDX);\n\r");
+		  // division by 255 to keep values in range:
+		  b_x = getSumPatch(IDDX, patch_size) / 255;
+		  b_y = getSumPatch(IDDY, patch_size) / 255;
+		  //printf("b_x = %d; b_y = %d;\n\r", b_x, b_y);
+		  //     [d] calculate the additional flow step and possibly terminate the iteration
+		  step_x = (G[3] * b_x - G[1] * b_y) / Det;
+		  step_y = (G[0] * b_y - G[2] * b_x) / Det;
+		  v_x += step_x;
+		  v_y += step_y; // - (?) since the origin in the image is in the top left of the image, with y positive pointing down
+		  //printf("step = [%d,%d]; v = [%d,%d];\n\r", step_x, step_y, v_x, v_y);
+		  //printf("pause(0.5);\n\r");
+		  // next iteration
+		  it++;
+	//      step_size = abs(step_x);
+	//      step_size += abs(step_y);
+		  //printf("status = %d, it = %d, step_size = %d\n\r", status[p], it, step_size);
+		} // iteration to find the right window in the new image
 
-    // (3) determine the 'G'-matrix [sum(Axx) sum(Axy); sum(Axy) sum(Ayy)], where sum is over the window
-    error = calculateG(G, DX, DY, half_window_size);
-    if(error == NO_MEMORY) return NO_MEMORY;
-
-    for(it = 0; it < 4; it++)
-    {
-      //printf("G[%d] = %d\n\r", it, G[it]);
-      G[it] /= 255; // to keep values in range
-      //printf("G[%d] = %d\n\r", it, G[it]);
-    }
-    // calculate G's determinant:
-    Det = G[0] * G[3] - G[1] * G[2];
-    //printf("Det = %d\n\r", Det);
-    Det = Det / subpixel_factor; // so that the steps will be expressed in subpixel units
-    //printf("Det = %d\n\r", Det);
-    if(Det < 1)
-    {
-      status[p] = 0;
-    }
-
-    // (4) iterate over taking steps in the image to minimize the error:
-    it = 0;
-    step_threshold = 2; // 0.2 as smallest step (L1)
-    v_x = 0;
-    v_y = 0;
-    step_size = step_threshold + 1;
-
-    while(status[p] == 1 && it < max_iterations && step_size >= step_threshold)
-    {
-      //printf("it = %d, (p_x+v_x,p_y+v_y) = (%d,%d)\n\r", it, p_x[p]+v_x, p_y[p]+v_y);
-      //printf("it = %d;", it);
-      // if the pixel goes outside the ROI in the image, stop tracking:
-      if(!(p_x[p]+v_x > ((half_window_size+1) * subpixel_factor) && p_x[p]+v_x < ((int)IMG_WIDTH-half_window_size) * subpixel_factor && p_y[p]+v_y > ((half_window_size+1) * subpixel_factor) && p_y[p]+v_y < ((int)IMG_HEIGHT-half_window_size)*subpixel_factor))
-      {
-        //printf("Outside of ROI\n\r");
-        status[p] = 0;
-        break;
-      }
-
-      //     [a] get the subpixel neighborhood in the new image
-
-
-      // clear J:
-      for(x = 0; x < patch_size; x++)
-      {
-        for(y = 0; y < patch_size; y++)
-        {
-          ix2 = (y * patch_size + x);
-          J_neighborhood[ix2] = 0;
-        }
-      }
-
-
-      getSubPixel(J_neighborhood, new_image_buf, p_x[p]+v_x, p_y[p]+v_y, half_window_size, subpixel_factor);
-      //     [b] determine the image difference between the two neighborhoods
-      //printf("I = ");
-      //printIntMatrix(I_neighborhood, patch_size, patch_size);
-      //printf("J = ");
-      //printIntMatrix(J_neighborhood, patch_size, patch_size);
-      //getSubPixel(J_neighborhood, new_image_buf, subpixel_factor * ((p_x[p]+v_x)/subpixel_factor), subpixel_factor * ((p_y[p]+v_y) / subpixel_factor), half_window_size, subpixel_factor);
-      //printf("J2 = ");
-      //printIntMatrix(J_neighborhood, patch_size, patch_size);
-      //printf("figure(); subplot(1,2,1); imshow(I/255); subplot(1,2,2); imshow(J/255);\n\r");
-      getImageDifference(I_neighborhood, J_neighborhood, ImDiff, patch_size, patch_size);
-      //printf("ImDiff = ");
-      //printIntMatrix(ImDiff, patch_size, patch_size);
-      error = calculateError(ImDiff, patch_size, patch_size);
-      if(error > error_threshold && it > max_iterations / 2)
-      {
-        status[p] = 0;
-        break;
-      }
-      //printf("error(%d) = %d;\n\r", it+1, error);
-      //     [c] calculate the 'b'-vector
-      //printf("DX = ");
-      //printIntMatrix(DX, patch_size, patch_size);
-      multiplyImages(ImDiff, DX, IDDX, patch_size, patch_size);
-      //printf("IDDX = ");
-      //printIntMatrix(IDDX, patch_size, patch_size);
-      multiplyImages(ImDiff, DY, IDDY, patch_size, patch_size);
-      //printf("DY = ");
-      //printIntMatrix(DY, patch_size, patch_size);
-      //printf("IDDY = ");
-      //printIntMatrix(IDDY, patch_size, patch_size);
-      //printf("figure(); subplot(2,3,1); imagesc(ImDiff); subplot(2,3,2); imagesc(DX); subplot(2,3,3); imagesc(DY);");
-      //printf("subplot(2,3,4); imagesc(IDDY); subplot(2,3,5); imagesc(IDDX);\n\r");
-      // division by 255 to keep values in range:
-      b_x = getSumPatch(IDDX, patch_size) / 255;
-      b_y = getSumPatch(IDDY, patch_size) / 255;
-      //printf("b_x = %d; b_y = %d;\n\r", b_x, b_y);
-      //     [d] calculate the additional flow step and possibly terminate the iteration
-      step_x = (G[3] * b_x - G[1] * b_y) / Det;
-      step_y = (G[0] * b_y - G[2] * b_x) / Det;
-      v_x += step_x;
-      v_y += step_y; // - (?) since the origin in the image is in the top left of the image, with y positive pointing down
-      //printf("step = [%d,%d]; v = [%d,%d];\n\r", step_x, step_y, v_x, v_y);
-      //printf("pause(0.5);\n\r");
-      // next iteration
-      it++;
-      step_size = abs(step_x);
-      step_size += abs(step_y);
-      //printf("status = %d, it = %d, step_size = %d\n\r", status[p], it, step_size);
-    } // iteration to find the right window in the new image
-
-    //printf("figure(); plot(error(1:(it+1)));\n\r");
-
-    new_x[p] = (p_x[p] + v_x) / subpixel_factor;
-    new_y[p] = (p_y[p] + v_y) / subpixel_factor;
-    p_x[p] /= subpixel_factor;
-    p_y[p] /= subpixel_factor;
+		//printf("figure(); plot(error(1:(it+1)));\n\r");
+//	printf("it = %d\n",it);
+		new_x[p] = (p_x[p] + v_x) / subpixel_factor;
+		new_y[p] = (p_y[p] + v_y) / subpixel_factor;
+		p_x[p] /= subpixel_factor;
+		p_y[p] /= subpixel_factor;
   }
 
+
+
+  // free all allocated variables:
+  free((int*) I_padded_neighborhood);
+  free((int*) I_neighborhood);
+  free((int*) J_neighborhood);
+  free((int*) DX);
+  free((int*) DY);
+  free((int*) ImDiff);
+  free((int*) IDDX);
+  free((int*) IDDY);
+  // no errors:
+  return OK;
+}
+
+/*********************************************************************
+ * _convolveImageHor
+ */
+
+void convolveImg_H(float *img, int ncols, int nrows, float *kernel, int kernel_width, float*conv_img)
+{
+  float *ptrrow = img;           /* Points to row's first pixel */
+  float *ptrout = conv_img, /* Points to next output pixel */
+    *ppp;
+  float sum;
+  int radius = kernel_width / 2;
+  int i, j, k;
+  /* Kernel width must be odd */
+  /* Must read from and write to different images */
+  /* Output image must be large enough to hold result */
+
+  /* For each row, do ... */
+  for (j = 0 ; j < nrows ; j++)  {
+
+    /* Zero leftmost columns */
+    for (i = 0 ; i < radius ; i++)
+      *ptrout++ = 0;
+
+    /* Convolve middle columns with kernel */
+    for ( ; i < ncols - radius ; i++)  {
+      ppp = ptrrow + i - radius;
+      sum = 0;
+      for (k = kernel_width-1 ; k >= 0 ; k--)
+        sum += *ppp++ * kernel[k];
+      *ptrout++ = sum;
+    }
+
+    /* Zero rightmost columns */
+    for ( ; i < ncols ; i++)
+      *ptrout++ = 0;
+
+    ptrrow += ncols;
+  }
+}
+
+void convolveImg_H_int(unsigned char *img, int ncols, int nrows, int *kernel, int kernel_width, unsigned char *conv_img)
+{
+  unsigned char *ptrrow = img;           /* Points to row's first pixel */
+  unsigned char *ptrout = conv_img, /* Points to next output pixel */
+    *ppp;
+  unsigned char sum;
+  int radius = kernel_width / 2;
+  int i, j, k;
+  /* Kernel width must be odd */
+  /* Must read from and write to different images */
+  /* Output image must be large enough to hold result */
+
+  /* For each row, do ... */
+  for (j = 0 ; j < nrows ; j++)  {
+
+    /* Zero leftmost columns */
+    for (i = 0 ; i < radius ; i++)
+      *ptrout++ = 0;
+
+    /* Convolve middle columns with kernel */
+    for ( ; i < ncols - radius ; i++)  {
+      ppp = ptrrow + i - radius;
+      sum = 0;
+      for (k = kernel_width-1 ; k >= 0 ; k--)
+        sum += *ppp++ >> kernel[k];
+      *ptrout++ = sum;
+    }
+
+    /* Zero rightmost columns */
+    for ( ; i < ncols ; i++)
+      *ptrout++ = 0;
+
+    ptrrow += ncols;
+  }
+}
+
+/*********************************************************************
+ * _convolveImageVert
+ */
+
+void convolveImg_V(float *img, int ncols, int nrows, float *kernel, int kernel_width, float *conv_img)
+{
+  float *ptrcol = img;            /* Points to row's first pixel */
+  float *ptrout = conv_img,  /* Points to next output pixel */
+    *ppp;
+  float sum;
+  int radius = kernel_width / 2;
+  int i, j, k;
+
+  /* Kernel width must be odd */
+  /* Must read from and write to different images */
+  /* Output image must be large enough to hold result */
+
+  /* For each column, do ... */
+  for (i = 0 ; i < ncols ; i++)  {
+
+    /* Zero topmost rows */
+    for (j = 0 ; j < radius ; j++)  {
+      *ptrout = 0;
+      ptrout += ncols;
+    }
+
+    /* Convolve middle rows with kernel */
+    for ( ; j < nrows - radius ; j++)  {
+      ppp = ptrcol + ncols * (j - radius);
+      sum = 0;
+      for (k = kernel_width-1 ; k >= 0 ; k--)  {
+        sum += *ppp * kernel[k];
+        ppp += ncols;
+      }
+      *ptrout = sum;
+      ptrout += ncols;
+    }
+
+    /* Zero bottommost rows */
+    for ( ; j < nrows ; j++)  {
+      *ptrout = 0;
+      ptrout += ncols;
+    }
+
+    ptrcol++;
+    ptrout -= nrows * ncols - 1;
+  }
+}
+
+void convolveImg_V_int(unsigned char *img, int ncols, int nrows, int *kernel, int kernel_width, unsigned char *conv_img)
+{
+  unsigned char *ptrcol = img;            /* Points to row's first pixel */
+  unsigned char *ptrout = conv_img,  /* Points to next output pixel */
+    *ppp;
+  unsigned char sum;
+  int radius = kernel_width / 2;
+  int i, j, k;
+
+  /* Kernel width must be odd */
+  /* Must read from and write to different images */
+  /* Output image must be large enough to hold result */
+
+  /* For each column, do ... */
+  for (i = 0 ; i < ncols ; i++)  {
+
+    /* Zero topmost rows */
+    for (j = 0 ; j < radius ; j++)  {
+      *ptrout = 0;
+      ptrout += ncols;
+    }
+
+    /* Convolve middle rows with kernel */
+    for ( ; j < nrows - radius ; j++)  {
+      ppp = ptrcol + ncols * (j - radius);
+      sum = 0;
+      for (k = kernel_width-1 ; k >= 0 ; k--)  {
+        sum += *ppp >> kernel[k];
+        ppp += ncols;
+      }
+      *ptrout = sum;
+      ptrout += ncols;
+    }
+
+    /* Zero bottommost rows */
+    for ( ; j < nrows ; j++)  {
+      *ptrout = 0;
+      ptrout += ncols;
+    }
+
+    ptrcol++;
+    ptrout -= nrows * ncols - 1;
+  }
+}
+
+/*********************************************************************
+ * _KLTComputeSmoothedImage
+ */
+
+void SmoothPyramid(float *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float *smooth_img)
+{
+  /* Output image must be large enough to hold result */
+
+  /* Create temporary image */
+	float *tmpimg;
+  tmpimg = (float *)malloc(ncols*nrows*sizeof(float));
+
+  /* Do convolution */
+  convolveImg_H(img, ncols, nrows, gauss_kernel, kernel_width, tmpimg);
+
+  convolveImg_V(tmpimg, ncols, nrows, gauss_kernel, kernel_width, smooth_img);
+  /* Free memory */
+  free(tmpimg);
+}
+
+void SmoothPyramid_int(unsigned char *img, int ncols, int nrows, int *gauss_kernel, int kernel_width, unsigned char *smooth_img)
+{
+  /* Output image must be large enough to hold result */
+
+  /* Create temporary image */
+  unsigned char *tmpimg;
+  tmpimg = (unsigned char *)malloc(ncols*nrows*sizeof(unsigned char));
+
+  /* Do convolution */
+  convolveImg_H_int(img, ncols, nrows, gauss_kernel, kernel_width, tmpimg);
+
+  convolveImg_V_int(tmpimg, ncols, nrows, gauss_kernel, kernel_width, smooth_img);
+  /* Free memory */
+  free(tmpimg);
+}
+
+void ComputePyramid( float* img, float** pyramid, int nLevels, int imgW, int imgH, int subsampling, float *gauss_kernel, int kernel_width)
+{
+  float *tmpimg, *currimg;
+  int ncols = imgW, nrows = imgH;
+  int subhalf = subsampling / 2;
+//  float sigma = subsampling * sigma_fact;  /* empirically determined */
+  int oldncols;
+  int i, x, y;
+
+//  if (subsampling != 2 && subsampling != 4 &&
+//      subsampling != 8 && subsampling != 16 && subsampling != 32)
+//    printf("(_KLTComputePyramid)  Pyramid's subsampling must "
+//             "be either 2, 4, 8, 16, or 32");
+
+  /* Copy original image to level 0 of pyramid */
+  memcpy(pyramid[0], img, ncols*nrows*sizeof(float));
+
+//  printf("pyramid 0 = \n");
+//  for(i=0;i<nrows;i++)
+//  {
+//	  for(j=0;j<ncols;j++)
+//	  {
+//		  printf("%f ",pyramid[0][i*ncols+j]);
+//	  }
+//	  printf("\n");
+//  }
+//  printf("\n");
+//  memcpy(currimg, img, ncols*nrows*sizeof(float));
+
+  currimg = img;
+  for (i = 1 ; i < nLevels ; i++)
+  {
+	  tmpimg = (float *) malloc (ncols*nrows*sizeof(float));
+//	  memcpy(tmpimg, pyramid[i-1], ncols*nrows*sizeof(float));
+	  SmoothPyramid(currimg, ncols, nrows, gauss_kernel, kernel_width, tmpimg);
+//    _KLTComputeSmoothedImage(currimg, sigma, tmpimg);
+
+
+    /* Subsample */
+    oldncols = ncols;
+    ncols /= subsampling;  nrows /= subsampling;
+    for (y = 0 ; y < nrows ; y++)
+    {
+    	for (x = 0 ; x < ncols ; x++)
+    	{
+            pyramid[i][y*ncols+x] =
+              tmpimg[(subsampling*y+subhalf)*oldncols +
+                          (subsampling*x+subhalf)];
+    	}
+    }
+
+    /* Reassign current image */
+
+    currimg = pyramid[i];
+
+    free(tmpimg);
+  }
+}
+
+void ComputePyramid_int( unsigned char *img, unsigned char **pyramid, int nLevels, int imgW, int imgH, int subsampling, float *gauss_kernel, int kernel_width)
+{
+  unsigned char *tmpimg, *currimg;
+  int ncols = imgW, nrows = imgH;
+  int subhalf = subsampling / 2;
+  int oldncols;
+  int i, x, y;
+
+  /* Copy original image to level 0 of pyramid */
+  memcpy(pyramid[0], img, ncols*nrows*sizeof(unsigned char));
+
+
+  currimg = img;
+  for (i = 1 ; i < nLevels ; i++)
+  {
+	  tmpimg = (unsigned char *) malloc (ncols*nrows*sizeof(unsigned char));
+	  SmoothPyramid_int(currimg, ncols, nrows, gauss_kernel, kernel_width, tmpimg);
+
+    /* Subsample */
+    oldncols = ncols;
+    ncols /= subsampling;  nrows /= subsampling;
+    for (y = 0 ; y < nrows ; y++)
+    {
+    	for (x = 0 ; x < ncols ; x++)
+    	{
+            pyramid[i][y*ncols+x] =
+              tmpimg[(subsampling*y+subhalf)*oldncols +
+                          (subsampling*x+subhalf)];
+    	}
+    }
+
+    /* Reassign current image */
+
+    currimg = pyramid[i];
+
+    free(tmpimg);
+  }
+}
+
+/*********************************************************************
+ * Compute Gradient
+ */
+
+void convolveSeparate(float *img, int ncols, int nrows, float *horiz_kernel, int horiz_kernel_width, float *vert_kernel, int vert_kernel_width, float *smooth_img)
+{
+  /* Output image must be large enough to hold result */
+
+  /* Create temporary image */
+	float *tmpimg;
+  tmpimg = (float *)malloc(ncols*nrows*sizeof(float));
+
+  /* Do convolution */
+  convolveImg_H(img, ncols, nrows, horiz_kernel, horiz_kernel_width, tmpimg);
+
+  convolveImg_V(tmpimg, ncols, nrows, vert_kernel, vert_kernel_width, smooth_img);
+  /* Free memory */
+  free(tmpimg);
+}
+
+void convolveSeparate_int(unsigned char *img, int ncols, int nrows, float *horiz_kernel, int horiz_kernel_width, float *vert_kernel, int vert_kernel_width, unsigned char *smooth_img)
+{
+  /* Output image must be large enough to hold result */
+
+  /* Create temporary image */
+  unsigned char *tmpimg;
+  tmpimg = (unsigned char *)malloc(ncols*nrows*sizeof(unsigned char));
+
+  /* Do convolution */
+  convolveImg_H_int(img, ncols, nrows, horiz_kernel, horiz_kernel_width, tmpimg);
+
+  convolveImg_V_int(tmpimg, ncols, nrows, vert_kernel, vert_kernel_width, smooth_img);
+  /* Free memory */
+  free(tmpimg);
+}
+
+void ComputeGradients(float *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float *gaussderiv_kernel, int kernel_deriv_width, float *gradx, float *grady)
+{
+
+  /* Output images must be large enough to hold result */
+
+  convolveSeparate(img, ncols, nrows, gaussderiv_kernel, kernel_deriv_width, gauss_kernel, kernel_width, gradx);
+  convolveSeparate(img, ncols, nrows, gauss_kernel, kernel_width, gaussderiv_kernel, kernel_deriv_width, grady);
+
+}
+
+void ComputeGradients_int(unsigned char *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float *gaussderiv_kernel, int kernel_deriv_width, unsigned char *gradx, unsigned char *grady)
+{
+
+  /* Output images must be large enough to hold result */
+
+  convolveSeparate_int(img, ncols, nrows, gaussderiv_kernel, kernel_deriv_width, gauss_kernel, kernel_width, gradx);
+  convolveSeparate_int(img, ncols, nrows, gauss_kernel, kernel_width, gaussderiv_kernel, kernel_deriv_width, grady);
+
+}
+
+/*********************************************************************
+ * Track Corners
+ */
+
+float interpolate(float x, float y, float *img, int ncols, int nrows)
+{
+  int xt = (int) x;  /* coordinates of top-left corner */
+  int yt = (int) y;
+  float ax = x - xt;
+  float ay = y - yt;
+  float *ptr = img + (ncols*yt) + xt;
+
+//  printf("xt = %d, yt = %d, ncols-2 = %d, nrows-2 = %d\n",xt,yt,ncols-2,nrows-2);
+//  assert (xt >= 0 && yt >= 0 && xt <= ncols - 2 && yt <= nrows - 2);
+//printf("ax = %f, ay = %f, p1 = %f, p2 = %f, p3 = %f, p4 = %f\n",ax, ay, *ptr, *(ptr+1),*(ptr+ncols),*(ptr+ncols+1));
+
+  return ( (1-ax) * (1-ay) * *ptr +
+           ax   * (1-ay) * *(ptr+1) +
+           (1-ax) *   ay   * *(ptr+(ncols)) +
+           ax   *   ay   * *(ptr+(ncols)+1) );
+}
+
+void computeIntensityDifference(float *img1, float *img2, int ncols, int nrows, float x11, float y11, float x22, float y22, int width, int height, float *imgdiff)
+{
+  int hw = width/2, hh = height/2;
+  float g1, g2;
+  int i, j;
+
+  /* Compute values */
+  for (j = -hh ; j <= hh ; j++)
+    for (i = -hw ; i <= hw ; i++)  {
+//      printf("x11+i = %f, y11+j = %f, x22+i = %f, y22+j = %f\n", x11+i, y11+j, x22+i, y22+j);
+      g1 = interpolate(x11+i, y11+j, img1, ncols, nrows);
+      g2 = interpolate(x22+i, y22+j, img2, ncols, nrows);
+//      printf("g1 = %f, g2 = %f\n", g1, g2);
+      *imgdiff++ = g1 - g2;
+    }
+}
+
+void computeGradientSum(float *gradx1, float *grady1,float *gradx2, float *grady2, int ncols, int nrows, float x11, float y11, float x22, float y22, int width, int height, float *gradx, float *grady)
+{
+  int hw = width/2, hh = height/2;
+  float g1, g2;
+  int i, j;
+
+  /* Compute values */
+  for (j = -hh ; j <= hh ; j++)
+    for (i = -hw ; i <= hw ; i++)  {
+      g1 = interpolate(x11+i, y11+j, gradx1, ncols, nrows);
+      g2 = interpolate(x22+i, y22+j, gradx2, ncols, nrows);
+      *gradx++ = g1 + g2;
+      g1 = interpolate(x11+i, y11+j, grady1, ncols, nrows);
+      g2 = interpolate(x22+i, y22+j, grady2, ncols, nrows);
+      *grady++ = g1 + g2;
+    }
+}
+
+void compute2by2GradientMatrix(float *gradx, float *grady, int width, int height, float *gxx, float *gxy, float *gyy)
+{
+  float gx, gy;
+  int i;
+
+  /* Compute values */
+  *gxx = 0.0;  *gxy = 0.0;  *gyy = 0.0;
+  for (i = 0 ; i < width * height ; i++)  {
+    gx = *gradx++;
+    gy = *grady++;
+    *gxx += gx*gx;
+    *gxy += gx*gy;
+    *gyy += gy*gy;
+  }
+}
+
+void compute2by1ErrorVector(float *imgdiff, float *gradx,float *grady, int width, int height, float step_factor, float *ex, float *ey)
+{
+  float diff;
+  int i;
+
+  /* Compute values */
+  *ex = 0;  *ey = 0;
+  for (i = 0 ; i < width * height ; i++)  {
+    diff = *imgdiff++;
+    *ex += diff * (*gradx++);
+    *ey += diff * (*grady++);
+  }
+  *ex *= step_factor;
+  *ey *= step_factor;
+}
+
+int solveEquation(float gxx, float gxy, float gyy, float ex, float ey, float small, float *dx, float *dy)
+{
+  float det = gxx*gyy - gxy*gxy;
+
+  if (det < small)  return -2;
+
+  *dx = (gyy*ex - gxy*ey)/det;
+  *dy = (gxx*ey - gxy*ex)/det;
+  return 0;
+}
+
+float sumAbsFloatWindow(float *fw, int width, int height)
+{
+  float sum = 0.0;
+  int w;
+
+  for ( ; height > 0 ; height--)
+    for (w=0 ; w < width ; w++)
+      sum += (float) fabs(*fw++);
+
+  return sum;
+}
+
+int trackFeature(float x11, float y11, float *x22, float *y22, float *img1, float *gradx1, float *grady1, float *img2, float *gradx2, float *grady2, int ncols, int nrows, int width, int height, float step_factor, int max_iterations, float small, float th, float max_residue)
+{
+  float *imgdiff, *gradx, *grady;
+  float gxx, gxy, gyy, ex, ey, dx, dy;
+  int iteration = 0;
+  int status;
+  int hw = width/2;
+  int hh = height/2;
+  int nc = ncols;
+  int nr = nrows;
+  float one_plus_eps = 1.001f;   /* To prevent rounding errors */
+
+
+  /* Allocate memory for windows */
+  imgdiff = (float *)malloc(width*height*sizeof(float));
+  gradx   = (float *)malloc(width*height*sizeof(float));
+  grady   = (float *)malloc(width*height*sizeof(float));
+
+  /* Iteratively update the window position */
+  do  {
+
+    /* If out of bounds, exit loop */
+    if (  x11-hw < 0.0f || nc-( x11+hw) < one_plus_eps ||
+         *x22-hw < 0.0f || nc-(*x22+hw) < one_plus_eps ||
+          y11-hh < 0.0f || nr-( y11+hh) < one_plus_eps ||
+         *y22-hh < 0.0f || nr-(*y22+hh) < one_plus_eps) {
+      status = -4;
+//      printf("out of bound\n");
+      break;
+    }
+
+    /* Compute gradient and difference windows */
+//printf("track_1\n");
+    computeIntensityDifference(img1, img2, ncols, nrows, x11, y11, *x22, *y22, width, height, imgdiff);
+
+//    printf("imgdiff = \n");
+//    for(i=0;i<height;i++)
+//    {
+//    	for(j=0; j<width; j++)
+//    	{
+//    		printf("%f ", imgdiff[i*width+j]);
+//    	}
+//    	printf("\n");
+//    }
+
+
+//printf("track_2\n");
+    computeGradientSum(gradx1, grady1, gradx2, grady2, ncols, nrows, x11, y11, *x22, *y22, width, height, gradx, grady);
+//printf("track_3\n");
+    /* Use these windows to construct matrices */
+    compute2by2GradientMatrix(gradx, grady, width, height, &gxx, &gxy, &gyy);
+//printf("track_4\n");
+    compute2by1ErrorVector(imgdiff, gradx, grady, width, height, step_factor, &ex, &ey);
+//printf("track_5\n");
+    /* Using matrices, solve equation for new displacement */
+    status = solveEquation(gxx, gxy, gyy, ex, ey, small, &dx, &dy);
+//printf("track_6\n");
+    if (status == -2)  break;
+
+    *x22 += dx;
+    *y22 += dy;
+//    printf("status = %d, gxx = %f, gxy = %f, gyy = %f, ex = %f, ey = %f, dx = %f, dy = %f, x22 = %f, y22 = %f\n",status,gxx,gxy,gyy,ex,ey,dx,dy,*x22,*y22);
+    iteration++;
+
+  }  while ((fabs(dx)>=th || fabs(dy)>=th) && iteration < max_iterations);
+//printf("track_7\n");
+  /* Check whether window is out of bounds */
+  if (*x22-hw < 0.0f || nc-(*x22+hw) < one_plus_eps ||
+      *y22-hh < 0.0f || nr-(*y22+hh) < one_plus_eps)
+    status = -4;
+//printf("track_8\n");
+  /* Check whether residue is too large */
+  if (status == 0)  {
+      computeIntensityDifference(img1, img2, ncols, nrows, x11, y11, *x22, *y22,
+                                  width, height, imgdiff);
+    if (sumAbsFloatWindow(imgdiff, width, height)/(width*height) > max_residue)
+      status = -5;
+  }
+//printf("track_9\n");
+  /* Free memory */
+  free(imgdiff);  free(gradx);  free(grady);
+
+  /* Return appropriate value */
+  if (status == -2)  return -2;
+  else if (status == -4)  return -4;
+  else if (status == -5)  return -5;
+  else if (iteration >= max_iterations)  return -3;
+  else  return 0;
+
+}
+
+// uses gayscale images
+int opticFlowLKPyramidal(unsigned char **new_gray_buf, unsigned char **old_gray_buf, int nLevels, int subsampling, int* p_x, int* p_y, int n_found_points, int imW, int imH, int* new_x, int* new_y, int *flow_point, int* status, int half_window_size, int max_iterations)
+{
+	// A Pyramidal implementation of Lucas-Kanade.
+	// For all points:
+	// (1) determine the subpixel neighborhood in the old image
+	// (2) get the x- and y- gradients
+	// (3) determine the 'G'-matrix [sum(Axx) sum(Axy); sum(Axy) sum(Ayy)], where sum is over the window
+	// (4) iterate over taking steps in the image to minimize the error:
+	//     [a] get the subpixel neighborhood in the new image
+	//     [b] determine the image difference between the two neighborhoods
+	//     [c] calculate the 'b'-vector
+	//     [d] calculate the additional flow step and possibly terminate the iteration
+	int p, subpixel_factor, x, y, it, step_threshold, step_x, step_y, v_x, v_y, Det, j;
+	int b_x, b_y, patch_size, padded_patch_size, error, step_size;
+	unsigned int ix1, ix2;
+	int* I_padded_neighborhood; int* I_neighborhood; int* J_neighborhood;
+	int* DX; int* DY; int* ImDiff; int* IDDX; int* IDDY;
+	int G[4];
+	int error_threshold;
+
+	// set the image width and height
+	IMG_WIDTH = imW;
+	IMG_HEIGHT = imH;
+	// spatial resolution of flow is 1 / subpixel_factor
+	subpixel_factor = 100;
+	// determine patch sizes and initialize neighborhoods
+	patch_size = (2*half_window_size + 1);
+	error_threshold = (25 * 25) * (patch_size * patch_size);
+
+	padded_patch_size = (2*half_window_size + 3);
+	I_padded_neighborhood = (int *) malloc(padded_patch_size * padded_patch_size * sizeof(int));
+	I_neighborhood = (int *) malloc(patch_size * patch_size * sizeof(int));
+	J_neighborhood = (int *) malloc(patch_size * patch_size * sizeof(int));
+	if(I_padded_neighborhood == 0 || I_neighborhood == 0 || J_neighborhood == 0)
+		return NO_MEMORY;
+	DX = (int *) malloc(patch_size * patch_size * sizeof(int));
+	DY = (int *) malloc(patch_size * patch_size * sizeof(int));
+	IDDX = (int *) malloc(patch_size * patch_size * sizeof(int));
+	IDDY = (int *) malloc(patch_size * patch_size * sizeof(int));
+	ImDiff = (int *) malloc(patch_size * patch_size * sizeof(int));
+	if(DX == 0 || DY == 0 || ImDiff == 0 || IDDX == 0 || IDDY == 0)
+		return NO_MEMORY;
+
+//	int xp, yp;
+	int xpout, ypout;
+	*flow_point = 0;
+//	int one_plus_eps = 1.001f*subpixel_factor;   /* To prevent rounding errors */
+
+	for(p = 0; p < n_found_points; p++)
+	{
+		// We want to be able to take steps in the image of 1 / subpixel_factor:
+//		xp = p_x[p] * subpixel_factor;
+//		yp = p_y[p] * subpixel_factor;
+		p_x[p] = p_x[p] * subpixel_factor;
+		p_y[p] = p_y[p] * subpixel_factor;
+//		printf("Subpixel coordinate: (%d,%d)\n\r", xp, yp);
+
+		for(j=nLevels-1; j>=0; j--)
+		{
+//			xp /= subsampling;  yp /= subsampling;
+			p_x[p] /= subsampling;  p_y[p] /= subsampling;
+			IMG_WIDTH /= subsampling; IMG_HEIGHT /= subsampling;
+			error_threshold /= subsampling;
+		}
+//		printf("Lowest level coordinate: (%d,%d)\n\r",xp,yp);
+		xpout = p_x[p]; ypout = p_y[p];
+
+		for(j=nLevels-1; j>=0; j--)
+		{
+//			printf("j = %d p = %d\n",j,p);
+			p_x[p] *= subsampling;  p_y[p] *= subsampling;
+			xpout *= subsampling;  ypout *= subsampling;
+			IMG_WIDTH *= subsampling; IMG_HEIGHT *= subsampling;
+			error_threshold *= subsampling;
+			printf("p[%d] = (%d, %d)\n\r",p, p_x[p], p_y[p]);
+//			printf("imgSize = (%d,%d)\n",IMG_WIDTH,IMG_HEIGHT);
+			//printf("*** NEW POINT ***\n\r");
+			// status: point is not yet lost:
+			status[p] = 1;
+
+//			printf("current coordinate: (%d,%d)\n\r",xp,yp);
+//			printf("condition: !(%d > %d && %d < %d && %d > %d && %d < %d ) \n",xp,((half_window_size+1) * subpixel_factor),xp, (IMG_WIDTH-half_window_size) * subpixel_factor,yp, ((half_window_size+1) * subpixel_factor), yp, (IMG_HEIGHT-half_window_size)*subpixel_factor);
+
+			// if the pixel is outside the ROI in the image, do not track it:
+//			if(!(xp > ((half_window_size+1) * subpixel_factor) && xp < (IMG_WIDTH-half_window_size) * subpixel_factor && yp > ((half_window_size+1) * subpixel_factor) && yp < (IMG_HEIGHT-half_window_size)*subpixel_factor))
+			if(!(p_x[p] > ((half_window_size+1) * subpixel_factor) && p_x[p] < (IMG_WIDTH-half_window_size) * subpixel_factor && p_y[p] > ((half_window_size+1) * subpixel_factor) && p_y[p] < (IMG_HEIGHT-half_window_size)*subpixel_factor))
+//			if( p_x[p] - ((half_window_size+1) * subpixel_factor) < 0 || (IMG_WIDTH-half_window_size) * subpixel_factor - p_x[p] < one_plus_eps ||
+//				p_y[p] - ((half_window_size+1) * subpixel_factor) < 0 || (IMG_HEIGHT-half_window_size)* subpixel_factor - p_y[p] < one_plus_eps)
+			{
+//			  printf("Outside of ROI p_x[%d] = (%d, %d)\n\r",p, p_x[p], p_y[p]);
+			  status[p] = 0;
+			}
+
+			// (1) determine the subpixel neighborhood in the old image
+			// we determine a padded neighborhood with the aim of subsequent gradient processing:
+			getSubPixel_gray(I_padded_neighborhood, old_gray_buf[j], p_x[p], p_y[p], half_window_size+1, subpixel_factor);
+			// Also get the original-sized neighborhood
+			for(x = 1; x < padded_patch_size - 1; x++)
+			{
+			  for(y = 1; y < padded_patch_size - 1; y++)
+			  {
+				ix1 = (y * padded_patch_size + x);
+				ix2 = ((y-1) * patch_size + (x-1));
+				I_neighborhood[ix2] = I_padded_neighborhood[ix1];
+			  }
+			}
+
+			// (2) get the x- and y- gradients
+			getGradientPatch(I_padded_neighborhood, DX, DY, half_window_size);
+
+			// (3) determine the 'G'-matrix [sum(Axx) sum(Axy); sum(Axy) sum(Ayy)], where sum is over the window
+			error = calculateG(G, DX, DY, half_window_size);
+			if(error == NO_MEMORY) return NO_MEMORY;
+
+			for(it = 0; it < 4; it++)
+			{
+			  //printf("G[%d] = %d\n\r", it, G[it]);
+			  G[it] /= 255; // to keep values in range
+			  //printf("G[%d] = %d\n\r", it, G[it]);
+			}
+			// calculate G's determinant:
+			Det = G[0] * G[3] - G[1] * G[2];
+			//printf("Det = %d\n\r", Det);
+			Det = Det / subpixel_factor; // so that the steps will be expressed in subpixel units
+//			printf("Det = %d\n\r", Det);
+			if(Det < 0.01f*subpixel_factor)
+			{
+//			  printf("small\n");
+			  status[p] = 0;
+			}
+
+			// (4) iterate over taking steps in the image to minimize the error:
+			it = 0;
+			step_threshold = 2; // 0.2 as smallest step (L1)
+			v_x = 0;
+			v_y = 0;
+			step_size = step_threshold + 1;
+
+			while(status[p] == 1 && it < max_iterations && step_size >= step_threshold)
+			{
+			  //printf("it = %d, (p_x+v_x,p_y+v_y) = (%d,%d)\n\r", it, xp+v_x, yp+v_y);
+			  //printf("it = %d;", it);
+			  // if the pixel goes outside the ROI in the image, stop tracking:
+			  if(!(xpout+v_x> ((half_window_size+1) * subpixel_factor) && xpout+v_x< ((int)IMG_WIDTH-half_window_size) * subpixel_factor && ypout+v_y>((half_window_size+1) * subpixel_factor) && ypout+v_y< ((int)IMG_HEIGHT-half_window_size)*subpixel_factor))
+			  {
+				printf("Outside of ROI p_xout[%d]\n\r",p);
+				status[p] = 0;
+				break;
+			  }
+
+			  //     [a] get the subpixel neighborhood in the new image
+
+
+			  // clear J:
+			  for(x = 0; x < patch_size; x++)
+			  {
+				for(y = 0; y < patch_size; y++)
+				{
+				  ix2 = (y * patch_size + x);
+				  J_neighborhood[ix2] = 0;
+				}
+			  }
+
+
+			  getSubPixel_gray(J_neighborhood, new_gray_buf[j], xpout+v_x, ypout+v_y, half_window_size, subpixel_factor);
+			  //     [b] determine the image difference between the two neighborhoods
+			  //printf("I = ");
+			  //printIntMatrix(I_neighborhood, patch_size, patch_size);
+			  //printf("J = ");
+			  //printIntMatrix(J_neighborhood, patch_size, patch_size);
+			  //getSubPixel(J_neighborhood, new_gray_buf, subpixel_factor * ((xp+v_x)/subpixel_factor), subpixel_factor * ((yp+v_y) / subpixel_factor), half_window_size, subpixel_factor);
+			  //printf("J2 = ");
+			  //printIntMatrix(J_neighborhood, patch_size, patch_size);
+			  //printf("figure(); subplot(1,2,1); imshow(I/255); subplot(1,2,2); imshow(J/255);\n\r");
+			  getImageDifference(I_neighborhood, J_neighborhood, ImDiff, patch_size, patch_size);
+			  //printf("ImDiff = ");
+			  //printIntMatrix(ImDiff, patch_size, patch_size);
+			  error = calculateError(ImDiff, patch_size, patch_size);
+			  if(error > error_threshold && it > max_iterations / 2)
+			  {
+//				  printf("error\n");
+				status[p] = 0;
+				break;
+			  }
+			  //printf("error(%d) = %d;\n\r", it+1, error);
+			  //     [c] calculate the 'b'-vector
+			  //printf("DX = ");
+			  //printIntMatrix(DX, patch_size, patch_size);
+			  multiplyImages(ImDiff, DX, IDDX, patch_size, patch_size);
+			  //printf("IDDX = ");
+			  //printIntMatrix(IDDX, patch_size, patch_size);
+			  multiplyImages(ImDiff, DY, IDDY, patch_size, patch_size);
+			  //printf("DY = ");
+			  //printIntMatrix(DY, patch_size, patch_size);
+			  //printf("IDDY = ");
+			  //printIntMatrix(IDDY, patch_size, patch_size);
+			  //printf("figure(); subplot(2,3,1); imagesc(ImDiff); subplot(2,3,2); imagesc(DX); subplot(2,3,3); imagesc(DY);");
+			  //printf("subplot(2,3,4); imagesc(IDDY); subplot(2,3,5); imagesc(IDDX);\n\r");
+			  // division by 255 to keep values in range:
+			  b_x = getSumPatch(IDDX, patch_size) / 255;
+			  b_y = getSumPatch(IDDY, patch_size) / 255;
+//			  printf("b_x = %d; b_y = %d;\n\r", b_x, b_y);
+			  //     [d] calculate the additional flow step and possibly terminate the iteration
+			  step_x = (G[3] * b_x - G[1] * b_y) / Det;
+			  step_y = (G[0] * b_y - G[2] * b_x) / Det;
+			  v_x += step_x;
+			  v_y += step_y; // - (?) since the origin in the image is in the top left of the image, with y positive pointing down
+//			  xpout += v_x;
+//			  ypout += v_y;
+//			  printf("step = [%d,%d]; v = [%d,%d];\n\r", step_x, step_y, v_x, v_y);
+			  //printf("pause(0.5);\n\r");
+			  // next iteration
+			  it++;
+			  step_size = abs(step_x);
+			  step_size += abs(step_y);
+//			  printf("status = %d, it = %d, step_size = %d\n\r", status[p], it, step_size);
+			} // iteration to find the right window in the new image
+			xpout += v_x;
+			ypout += v_y;
+			//printf("figure(); plot(error(1:(it+1)));\n\r");
+
+		}
+//		printf("it = %d\n",it);
+//		new_x[p] = xpout / subpixel_factor;
+//		new_y[p] = ypout / subpixel_factor;
+		p_x[p] /= subpixel_factor;
+		p_y[p] /= subpixel_factor;
+		new_x[*flow_point] = xpout / subpixel_factor;
+		new_y[*flow_point] = ypout / subpixel_factor;
+		(*flow_point)++;
+//		if(status[p] && !(xpout < borderx*subpixel_factor || xpout > (imW-1-borderx)*subpixel_factor || ypout < bordery*subpixel_factor || ypout > (imH-1-bordery)*subpixel_factor))
+//		{
+//			new_x[*flow_point] = xpout / subpixel_factor;
+//			new_y[*flow_point] = ypout / subpixel_factor;
+//			(*flow_point)++;
+//		}
+
+  }
 
 
   // free all allocated variables:
@@ -1311,6 +2233,7 @@ int opticFlowLK(unsigned char * new_image_buf, unsigned char * old_image_buf, in
   // no errors:
   return OK;
 }
+
 
 extern void showFlow(unsigned char * frame_buf, int* x, int* y, int* status, int n_found_points, int* new_x, int* new_y, int imgW, int imgH)
 {
@@ -2179,6 +3102,29 @@ void quick_sort (float *a, int n) {
     quick_sort(l, a + n - l);
 }
 
+void quick_sort_int (int *a, int n) {
+    if (n < 2)
+        return;
+    int p = a[n / 2];
+    int *l = a;
+    int *r = a + n - 1;
+    while (l <= r) {
+        if (*l < p) {
+            l++;
+            continue;
+        }
+        if (*r > p) {
+            r--;
+            continue; // we need to check the condition (l <= r) every time we change the value of l or r
+        }
+        int t = *l;
+        *l++ = *r;
+        *r-- = t;
+    }
+    quick_sort_int(a, r - a + 1);
+    quick_sort_int(l, a + n - l);
+}
+
 //void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH){
 //    int x, y;
 //    unsigned char *Y, *gray;
@@ -2329,7 +3275,7 @@ void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int im
 
 	CvtYUYV2Gray(gray_frame, frame, imW, imH); // convert to gray scaled image is a must for FAST corner
 
-	pnts_fast = fast12_detect((const byte*)gray_frame, imW, imH, imW, fast_threshold, count); //widthstep for gray-scaled image = its width; int widthstep = ((width*sizeof(unsigned char)*nchannels)%4!=0)?((((width*sizeof(unsigned char)*nchannels)/4)*4) + 4):(width*sizeof(unsigned char)*nchannels);
+	pnts_fast = fast9_detect((const byte*)gray_frame, imW, imH, imW, fast_threshold, count); //widthstep for gray-scaled image = its width; int widthstep = ((width*sizeof(unsigned char)*nchannels)%4!=0)?((((width*sizeof(unsigned char)*nchannels)/4)*4) + 4):(width*sizeof(unsigned char)*nchannels);
 
 	// transform the points to the format we need (is also done in the other corner finders
 	*count = (*count > MAX_COUNT) ? MAX_COUNT : *count;
@@ -2574,11 +3520,11 @@ void OFfilter2(float *OFx, float *OFy, float dx, float dy, int count, int OF_Fil
 			x_buf[OF_buf_point] = 0.0;
 			y_buf[OF_buf_point] = 0.0;
 		}
-		OF_buf_point = (OF_buf_point+1) %5;
+		OF_buf_point = (OF_buf_point+1) %10;
 
-		for (int i=0;i<5;i++) {
-			x_avg+=x_buf[i]*0.2;
-			y_avg+=y_buf[i]*0.2;
+		for (int i=0;i<10;i++) {
+			x_avg+=x_buf[i]*0.1;
+			y_avg+=y_buf[i]*0.1;
 		}
 
 		*OFx = x_avg;
@@ -2597,13 +3543,13 @@ void OFfilter2(float *OFx, float *OFy, float dx, float dy, int count, int OF_Fil
 			x_buf2[OF_buf_point2] = 0.0;
 			y_buf2[OF_buf_point2] = 0.0;
 		}
-		OF_buf_point2 = (OF_buf_point2+1) %11;
+		OF_buf_point2 = (OF_buf_point2+1) %11; // 11
 
-		quick_sort(x_buf2,11);
-		quick_sort(y_buf2,11);
+		quick_sort(x_buf2,11); // 11
+		quick_sort(y_buf2,11); // 11
 
-		*OFx = x_buf2[6];
-		*OFy = y_buf2[6];
+		*OFx = x_buf2[6]; // 6
+		*OFy = y_buf2[6]; // 6
 	}
 	else
 	{

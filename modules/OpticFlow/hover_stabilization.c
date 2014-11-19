@@ -66,6 +66,7 @@
 #error "ALL control gains have to be positive!!!"
 #endif
 
+bool activate_opticflow_hover;
 int32_t vision_phi_pgain;
 int32_t vision_phi_igain;
 int32_t vision_theta_pgain;
@@ -77,7 +78,7 @@ struct Int32Eulers cmd_euler;
 float Velx_Int;
 float Vely_Int;
 
-#define CMD_OF_SAT	350 // 40 deg = 2859.1851
+#define CMD_OF_SAT	1500 // 40 deg = 2859.1851
 unsigned char saturateX = 0, saturateY = 0;
 unsigned int set_heading;
 int phi0;
@@ -89,6 +90,7 @@ void init_hover_stabilization_onvision()
 {
 	INT_EULERS_ZERO(cmd_euler);
 
+	activate_opticflow_hover = VISION_HOVER;
 	vision_phi_pgain = VISION_PHI_PGAIN;
 	vision_phi_igain = VISION_PHI_IGAIN;
 	vision_theta_pgain = VISION_THETA_PGAIN;
@@ -131,11 +133,25 @@ void run_opticflow_hover(void)
 {
 	if(saturateX==0)
 	{
-		Velx_Int += vision_theta_igain*Velx;
+		if(activate_opticflow_hover==TRUE)
+		{
+			Velx_Int += vision_theta_igain*Velx;
+		}
+		else
+		{
+			Velx_Int += vision_theta_igain*V_body.x;
+		}
 	}
 	if(saturateY==0)
 	{
-		Vely_Int += vision_phi_igain*Vely;
+		if(activate_opticflow_hover==TRUE)
+		{
+			Vely_Int += vision_phi_igain*Vely;
+		}
+		else
+		{
+			Vely_Int += vision_phi_igain*V_body.y;
+		}
 	}
 
 	if(set_heading)
@@ -146,8 +162,27 @@ void run_opticflow_hover(void)
 		set_heading = 0;
 	}
 
-	cmd_euler.phi =  (phi0 - (vision_phi_pgain*Vely + Vely_Int));
-	cmd_euler.theta =  (theta0 + (vision_theta_pgain*Velx + Velx_Int));
+//	if(flow_count)
+//	{
+//		cmd_euler.phi =  (phi0 - (vision_phi_pgain*Vely + Vely_Int));
+//		cmd_euler.theta =  (theta0 + (vision_theta_pgain*Velx + Velx_Int));
+//	}
+//	else
+//	{
+//		cmd_euler.phi = 0;
+//		cmd_euler.theta = 0;
+//	}
+	if(activate_opticflow_hover==TRUE)
+	{
+		cmd_euler.phi =  (phi0 - (vision_phi_pgain*Vely + Vely_Int));
+		cmd_euler.theta =  (theta0 + (vision_theta_pgain*Velx + Velx_Int));
+	}
+	else
+	{
+		cmd_euler.phi =  (phi0 - (vision_phi_pgain*V_body.y + Vely_Int));
+		cmd_euler.theta =  (theta0 + (vision_theta_pgain*V_body.x + Velx_Int));
+	}
+
 
 	saturateX = 0; saturateY = 0;
 	if(cmd_euler.phi<-CMD_OF_SAT){cmd_euler.phi = -CMD_OF_SAT; saturateX = 1;}

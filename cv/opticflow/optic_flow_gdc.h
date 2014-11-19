@@ -41,6 +41,7 @@ void thresholdImage(int* Harris, int max_val, int max_factor);
 int findCorners(unsigned char *frame_buf, int MAX_POINTS, int *x, int *y, int suppression_distance_squared, int* n_found_points, int mark_points, int imW, int imH);
 int findActiveCorners(unsigned char *frame_buf, unsigned int GRID_ROWS, int ONLY_STOPPED, int *x, int *y, int* active, int* n_found_points, int mark_points, int imW, int imH);
 void getSubPixel(int* Patch, unsigned char* buf, int center_x, int center_y, int half_window_size, int subpixel_factor);
+void getSubPixel_gray(int* Patch, unsigned char* frame_buf, int center_x, int center_y, int half_window_size, int subpixel_factor);
 int calculateG(int* G, int* DX, int* DY, int half_window_size);
 void getGradientPatch(int* Patch, int* DX, int* DY, int half_window_size);
 int getSumPatch(int* Patch, int size);
@@ -56,6 +57,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, int* DIV_FILTER);
 void slopeEstimation(float *z_x, float *z_y, float *three_dimensionality, float *POE_x, float *POE_y, float d_heading, float d_pitch, float* pu, float* pv, float min_error_u, float min_error_v);
 void quick_sort (float *a, int n);
+void quick_sort_int (int *a, int n);
 void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH);
 void yuyv_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst);
 void uyvy_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst);
@@ -73,4 +75,28 @@ void YUV422TORGB(unsigned char *YUV, unsigned char *RGB, unsigned char *GRAY, in
 void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height, char filename[100]);
 void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_words, int patch_size, int *learned_samples, int n_samples_image, float alpha, int Width, int Height, int *filled);
 void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height, int border_width, int border_height);
+
+void convolveImg_H_int(unsigned char *img, int ncols, int nrows, int *kernel, int kernel_width, unsigned char *conv_img);
+void convolveImg_H(float *img, int ncols, int nrows, float *kernel, int kernel_width, float *conv_img);
+void convolveImg_V_int(unsigned char *img, int ncols, int nrows, int *kernel, int kernel_width, unsigned char *conv_img);
+void convolveImg_V(float *img, int ncols, int nrows, float *kernel, int kernel_width, float *conv_img);
+void SmoothPyramid_int(unsigned char *img, int ncols, int nrows, int *gauss_kernel, int kernel_width, unsigned char *smooth_img);
+void SmoothPyramid(float *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float  *smooth_img);
+void ComputePyramid_int( unsigned char *img, unsigned char **pyramid, int nLevels, int imgW, int imgH, int subsampling, float *gauss_kernel, int kernel_width);
+void ComputePyramid( float* img, float** pyramid, int nLevels, int imgW, int imgH, int subsampling, float *gauss_kernel, int kernel_width);
+void convolveSeparate_int(unsigned char *img, int ncols, int nrows, float *horiz_kernel, int horiz_kernel_width, float *vert_kernel, int vert_kernel_width, unsigned char *smooth_img);
+void convolveSeparate(float *img, int ncols, int nrows, float *horiz_kernel, int horiz_kernel_width, float *vert_kernel, int vert_kernel_width, float *smooth_img);
+void ComputeGradients_int(unsigned char *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float *gaussderiv_kernel, int kernel_deriv_width, unsigned char *gradx, unsigned char *grady);
+void ComputeGradients(float *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float *gaussderiv_kernel, int kernel_deriv_width, float * gradx, float *grady);
+
+float interpolate(float x, float y, float *img, int ncols, int nrows);
+void computeIntensityDifference(float *img1, float *img2, int ncols, int nrows, float x1, float y1, float x2, float y2, int width, int height, float *imgdiff);
+void computeGradientSum(float *gradx1, float *grady1,float *gradx2, float *grady2, int ncols, int nrows, float x1, float y1, float x2, float y2, int width, int height, float *gradx, float *grady);
+void compute2by2GradientMatrix(float *gradx, float *grady, int width, int height, float *gxx, float *gxy, float *gyy);
+void compute2by1ErrorVector(float *imgdiff, float *gradx,float *grady, int width, int height, float step_factor, float *ex, float *ey);
+int solveEquation(float gxx, float gxy, float gyy, float ex, float ey, float small, float *dx, float *dy);
+float sumAbsFloatWindow(float *fw, int width, int height);
+int trackFeature(float x1, float y1, float *x2, float *y2, float *img1, float *gradx1, float *grady1, float *img2, float *gradx2, float *grady2, int ncols, int nrows, int width, int height, float step_factor, int max_iterations, float small, float th, float max_residue);
+
+int opticFlowLKPyramidal(unsigned char **new_gray_buf, unsigned char **old_gray_buf, int nLevels, int subsampling, int* p_x, int* p_y, int n_found_points, int imW, int imH, int* new_x, int* new_y, int *flow_point, int* status, int half_window_size, int max_iterations);
 #endif

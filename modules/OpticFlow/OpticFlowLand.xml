@@ -24,7 +24,7 @@ include $(PAPARAZZI_HOME)/sw/ext/ardrone2_vision/Makefile.paths
           
 VISION_MODULE_FOLDER = $(DIR_MODULES)/OpticFlow
       	     	
-$(TARGET).CFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -D__USE_GNU 
+$(TARGET).CFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -D__USE_GNU
 $(TARGET).CXXFLAGS += -I$(PAPARAZZI_HOME)/sw/include/ -I$(PAPARAZZI_SRC)/sw/airborne -I$(PAPARAZZI_SRC)/conf/autopilot -I$(PAPARAZZI_SRC)/sw/airborne/arch/$($(TARGET).ARCHDIR) -I$(VARINCLUDE) -I$(ACINCLUDE) -I$(PAPARAZZI_SRC)/sw/airborne/modules/
 $(TARGET).CXXFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -D__USE_GNU
 
@@ -32,8 +32,17 @@ $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/hover_stabilization.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/optic_flow_gdc.c
-<!--$(TARGET).srcs += $(DIR_CV)/opticflow/fastRosten.c-->
-$(TARGET).srcs += $(DIR_CV)/opticflow/fast12/fastRosten.c
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/convolve.c
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/klt_error.c
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/pnmio.c   	
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/pyramid.c
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/selectGoodFeatures.c
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/storeFeatures.c 
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/trackFeatures.c 
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/klt.c 
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/klt_util.c 
+#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/writeFeatures.c 
+$(TARGET).srcs += $(DIR_CV)/opticflow/fast9/fastRosten.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/nrutil.c
 $(TARGET).srcs += $(DIR_CV)/encoding/jpeg.c
 $(TARGET).srcs += $(DIR_CV)/encoding/rtp.c

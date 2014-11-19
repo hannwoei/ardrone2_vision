@@ -16,7 +16,9 @@ extern float opt_angle_x_raw;
 extern float opt_angle_y_raw;
 
 extern float divergence;
-
+extern int count;
+extern int flow_count;
+extern struct FloatVect3 V_body;
 extern bool_t snapshot;
 
 extern int32_t fast_tune;
