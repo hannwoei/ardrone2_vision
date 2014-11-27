@@ -3520,11 +3520,11 @@ void OFfilter2(float *OFx, float *OFy, float dx, float dy, int count, int OF_Fil
 			x_buf[OF_buf_point] = 0.0;
 			y_buf[OF_buf_point] = 0.0;
 		}
-		OF_buf_point = (OF_buf_point+1) %10;
+		OF_buf_point = (OF_buf_point+1) %20;
 
-		for (int i=0;i<10;i++) {
-			x_avg+=x_buf[i]*0.1;
-			y_avg+=y_buf[i]*0.1;
+		for (int i=0;i<20;i++) {
+			x_avg+=x_buf[i]*0.05;
+			y_avg+=y_buf[i]*0.05;
 		}
 
 		*OFx = x_avg;
