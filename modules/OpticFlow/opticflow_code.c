@@ -46,6 +46,8 @@ float OFx, OFy, dx_sum, dy_sum;
 #define PI 3.14159265359
 #define FOV_H 0.67020643276 //(38.4/180*PI);
 #define FOV_W 0.89360857702 //(51.2/180*PI);
+#define PX_RAD	343.1211 // (px/rad)
+#define PY_RAD	348.5053 // (px/rad)
 
 // Corner Detection
 int32_t fast_tune;
@@ -121,7 +123,7 @@ void my_plugin_init(void)
 	new_y = (int *) calloc(MAX_COUNT,sizeof(int));
 	status = (int *) calloc(MAX_COUNT,sizeof(int));
 	dx = (int *) calloc(MAX_COUNT,sizeof(int));
-	dy = (int *) calloc(MAX_COUNT,sizeof(int));FOV_W
+	dy = (int *) calloc(MAX_COUNT,sizeof(int));
 
 	OFx = 0.0;
 	OFy = 0.0;
@@ -358,6 +360,8 @@ void my_plugin_run(unsigned char *frame)
 //		diff_roll = (curr_roll - prev_roll)*atan((double)imgWidth/Fx_ARdrone)/FOV_W;
 		diff_pitch = (curr_pitch - prev_pitch)*imgHeight/FOV_H;
 		diff_roll = (curr_roll - prev_roll)*imgWidth/FOV_W;
+//		diff_pitch = (curr_pitch - prev_pitch)*PY_RAD;
+//		diff_roll = (curr_roll - prev_roll)*PX_RAD;
 
 		prev_pitch = curr_pitch;
 		prev_roll = curr_roll;
@@ -402,6 +406,8 @@ void my_plugin_run(unsigned char *frame)
 
 	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
 	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
+//	Velx = OFy*cam_h*FPS/Fy_ARdrone;
+//	Vely = -OFx*cam_h*FPS/Fx_ARdrone;
 
 
 	if(snapshot)
