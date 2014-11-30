@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013
+ * Copyright (C) 2014
  *
  * This file is part of Paparazzi.
  *
@@ -20,10 +20,10 @@
  */
 
 /**
- * @file opticflow_module.h
- * optic-flow based landing for ardrone2.
+ * @file paparazzi/sw/ext/ardrone2_vision/modules/OpticFlow/opticflow_module.h
+ * @brief optical-flow based hovering for Parrot AR.Drone 2.0
  *
- * Use the tcp output of a custom GStreamer framework plugin to receive
+ * Sensors from vertical camera and IMU of Parrot AR.Drone 2.0
  */
 
 #ifndef OPTICFLOW_LAND_H
@@ -38,7 +38,7 @@ extern void opticflow_module_stop(void);
 // Frame Rate
 extern float FPS;
 struct timeval;
-long time_elapsed (struct timeval *t1, struct timeval *t2) ;
+long time_elapsed(struct timeval *t1, struct timeval *t2);
 void start_timer(void);
 long end_timer(void);
 

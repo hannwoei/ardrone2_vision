@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013
+ * Copyright (C) 2014 Hann Woei Ho
  *
  * This file is part of Paparazzi.
  *

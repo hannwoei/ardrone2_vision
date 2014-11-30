@@ -14,10 +14,7 @@
   <periodic fun="opticflow_module_run()" freq="60" start="opticflow_module_start()" stop="opticflow_module_stop()" autorun="TRUE"/>
   <makefile>
     <define name="ARDRONE_VIDEO_PORT" value="2002" />
-    <define name="USE_ARDRONE_VIDEO" />  
-    <define name="USE_FMS" value="0"/>
-    <define name="USE_OPTICFLOW_HOVER" value="1"/>
-<!--    <file name="video.c"/>  -->
+    <define name="USE_ARDRONE_VIDEO" />
       <raw>
 
 include $(PAPARAZZI_HOME)/sw/ext/ardrone2_vision/Makefile.paths
@@ -32,18 +29,7 @@ $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/hover_stabilization.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/optic_flow_gdc.c
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/convolve.c
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/klt_error.c
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/pnmio.c   	
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/pyramid.c
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/selectGoodFeatures.c
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/storeFeatures.c 
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/trackFeatures.c 
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/klt.c 
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/klt_util.c 
-#$(TARGET).srcs += $(DIR_CV)/opticflow/klt/writeFeatures.c 
 $(TARGET).srcs += $(DIR_CV)/opticflow/fast9/fastRosten.c
-$(TARGET).srcs += $(DIR_CV)/opticflow/nrutil.c
 $(TARGET).srcs += $(DIR_CV)/encoding/jpeg.c
 $(TARGET).srcs += $(DIR_CV)/encoding/rtp.c
 $(TARGET).srcs += $(DIR_CV)/trig.c

@@ -1,38 +1,42 @@
+/*
+ * Copyright (C) 2014 Hann Woei Ho
+ *
+ * This file is part of Paparazzi.
+ *
+ * Paparazzi is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * Paparazzi is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Paparazzi; see the file COPYING.  If not, write to
+ * the Free Software Foundation, 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
 
 #ifndef _OPT_FL_LAND_H
 #define _OPT_FL_LAND_H
 
-#include "math/pprz_algebra_int.h"
-
 // Settable by pluging
 extern unsigned int imgWidth, imgHeight;
-extern unsigned int tcp_port;
-extern unsigned int adjust_factor;
 extern unsigned int verbose;
-extern float opt_trans_x;
-extern float opt_trans_y;
-extern float Velx, Vely;
-extern float opt_angle_x_raw;
-extern float opt_angle_y_raw;
 
-extern float divergence;
+// Variables used by the controller
+extern float Velx, Vely;
 extern int count;
 extern int flow_count;
 extern struct FloatVect3 V_body;
-extern bool_t snapshot;
-
-extern int32_t fast_tune;
 
 // Called by plugin
 void my_plugin_init(void);
 void my_plugin_run(unsigned char *frame);
 
-// Called by ahrs
-
-//void opticFlowPropagateRates(struct Int32Rates* body_rate);
-//void visionInputPropagate(struct Int32Rates body_rate, struct Int32Vect3 body_accel);
+// Timer
 void start_timer_rates(void);
 long end_timer_rates(void);
-
-
 #endif

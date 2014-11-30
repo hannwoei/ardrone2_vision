@@ -1,102 +1,36 @@
+/*
+ * Copyright (C) 2014 Hann Woei Ho
+ *
+ * This file is part of Paparazzi.
+ *
+ * Paparazzi is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * Paparazzi is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Paparazzi; see the file COPYING.  If not, write to
+ * the Free Software Foundation, 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
+
 #ifndef OPTIC
 #define OPTIC
-
-typedef struct flowPoint
-{
-	int x;
-	int y;
-	int prev_x;
-	int prev_y;
-	int dx;
-	int dy;
-	int new_dx;
-	int new_dy;
-//	double P[16]; // represents a diagonal 4x4 matrix
-//	double Q[16]; // represents a diagonal 4x4 matrix
-//	double R[16]; // represents a diagonal 4x4 matrix
-//	double K[16]; // represents a diagonal 4x4 matrix
-//	int n_observations;
-} flowPoint;
-
-typedef struct detectedPoint
-{
-	int x;
-	int y;
-} detectedPoint;
-
-int getMaximum(int * Im);
-int getMinimum(int * Im);
-void getGradientPixelWH(unsigned char *frame_buf, int x, int y, int* dx, int* dy);
-void getSimpleGradient(unsigned char* frame_buf, int* DX, int* DY);
 void multiplyImages(int* ImA, int* ImB, int* ImC, int width, int height);
 void getImageDifference(int* ImA, int* ImB, int* ImC, int width, int height);
-int calculateError(int* ImC, int width, int height);
-void printIntMatrix(int* Matrix, int width, int height);
-void printIntMatrixPart(int* Matrix, int width, int height, int n_cols, int n_rows, int x_center, int y_center);
-void smoothGaussian(int* Src, int* Dst);
-void getHarris(int* DXX, int* DXY, int* DYY, int* Harris);
-int findLocalMaxima(int* Harris, int max_val, int MAX_POINTS, int* p_x, int* p_y, int suppression_distance_squared, int* n_found_points);
-void excludeArea(unsigned int* Mask, int x, int y, int suppression_distance_squared);
-void thresholdImage(int* Harris, int max_val, int max_factor);
-int findCorners(unsigned char *frame_buf, int MAX_POINTS, int *x, int *y, int suppression_distance_squared, int* n_found_points, int mark_points, int imW, int imH);
-int findActiveCorners(unsigned char *frame_buf, unsigned int GRID_ROWS, int ONLY_STOPPED, int *x, int *y, int* active, int* n_found_points, int mark_points, int imW, int imH);
-void getSubPixel(int* Patch, unsigned char* buf, int center_x, int center_y, int half_window_size, int subpixel_factor);
 void getSubPixel_gray(int* Patch, unsigned char* frame_buf, int center_x, int center_y, int half_window_size, int subpixel_factor);
-int calculateG(int* G, int* DX, int* DY, int half_window_size);
 void getGradientPatch(int* Patch, int* DX, int* DY, int half_window_size);
 int getSumPatch(int* Patch, int size);
-void showFlow(unsigned char * frame_buf, int* x, int* y, int* status, int n_found_points, int* new_x, int* new_y, int imgW, int imgH);
+int calculateG(int* G, int* DX, int* DY, int half_window_size);
+int calculateError(int* ImC, int width, int height);
 int opticFlowLK(unsigned char * new_image_buf, unsigned char * old_image_buf, int* p_x, int* p_y, int n_found_points, int imW, int imH, int* new_x, int* new_y, int* status, int half_window_size, int max_iterations);
-void MatMul(float* Mat1, float* Mat2, float* Mat3, int MatW, int MatH);
-void MatVVMul(float* MVec, float** Mat, float* Vec, int MatW, int MatH);
-void ScaleAdd(float* Mat3, float* Mat1, float Scale, float* Mat2, int MatW, int MatH);
-int dsvd(float **a, int m, int n, float *w, float **v);
-void svbksb(float **u, float *w, float **v, int m, int n, float *b, float *x);
-void svdSolve(float *x_svd, float **u, int m, int n, float *b);
-void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, int *y, int *dx, int *dy, int count, int n_samples, float* min_error_u, float* min_error_v, int n_iterations, float error_threshold, int *n_inlier_minu, int *n_inlier_minv);
-void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float* pu, float* pv, int imgWidth, int imgHeight, int* DIV_FILTER);
-void slopeEstimation(float *z_x, float *z_y, float *three_dimensionality, float *POE_x, float *POE_y, float d_heading, float d_pitch, float* pu, float* pv, float min_error_u, float min_error_v);
 void quick_sort (float *a, int n);
 void quick_sort_int (int *a, int n);
 void CvtYUYV2Gray(unsigned char *grayframe, unsigned char *frame, int imW, int imH);
-void yuyv_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst);
-void uyvy_to_rgb24 (int width, int height, unsigned char *src, unsigned char *dst);
-void setPointsToFlowPoints(struct flowPoint flow_points[], struct detectedPoint detected_points[], int *flow_point_size, int *count, int MAX_COUNT);
-void findPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[]);
-void trackPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points0[],struct detectedPoint detected_points1[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
-void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_x, float *POE_y, float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int* DIV_FILTER);
-void lineDivergence(float *divergence, int *x, int *y, int *new_x, int *new_y, int count);
-void subimage(unsigned char *gray_frame, unsigned char *subframe, int subimH, int subimW, int wInit, int hInit);
-void findDistributedPoints(unsigned char *gray_frame, unsigned char *frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *status);
-void trackDistributedPoints(unsigned char *frame, unsigned char *prev_frame, int imW, int imH, int *count, int max_count, int MAX_COUNT, struct flowPoint flow_points[],int *flow_point_size, struct detectedPoint detected_points[], int *x, int *y, int *new_x, int *new_y, int *dx, int *dy, int *status);
-void OFfilter(float *opt_angle_x_raw, float *opt_angle_y_raw, struct flowPoint flow_points[], int count, int OF_FilterType);
-void OFfilter2(float *OFx, float *OFy, float dx, float dy, int count, int OF_FilterType);
-void YUV422TORGB(unsigned char *YUV, unsigned char *RGB, unsigned char *GRAY, int Width, int Height);
-void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height, char filename[100]);
-void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_words, int patch_size, int *learned_samples, int n_samples_image, float alpha, int Width, int Height, int *filled);
-void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height, int border_width, int border_height);
-
-void convolveImg_H_int(unsigned char *img, int ncols, int nrows, int *kernel, int kernel_width, unsigned char *conv_img);
-void convolveImg_H(float *img, int ncols, int nrows, float *kernel, int kernel_width, float *conv_img);
-void convolveImg_V_int(unsigned char *img, int ncols, int nrows, int *kernel, int kernel_width, unsigned char *conv_img);
-void convolveImg_V(float *img, int ncols, int nrows, float *kernel, int kernel_width, float *conv_img);
-void SmoothPyramid_int(unsigned char *img, int ncols, int nrows, int *gauss_kernel, int kernel_width, unsigned char *smooth_img);
-void SmoothPyramid(float *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float  *smooth_img);
-void ComputePyramid_int( unsigned char *img, unsigned char **pyramid, int nLevels, int imgW, int imgH, int subsampling, float *gauss_kernel, int kernel_width);
-void ComputePyramid( float* img, float** pyramid, int nLevels, int imgW, int imgH, int subsampling, float *gauss_kernel, int kernel_width);
-void convolveSeparate_int(unsigned char *img, int ncols, int nrows, float *horiz_kernel, int horiz_kernel_width, float *vert_kernel, int vert_kernel_width, unsigned char *smooth_img);
-void convolveSeparate(float *img, int ncols, int nrows, float *horiz_kernel, int horiz_kernel_width, float *vert_kernel, int vert_kernel_width, float *smooth_img);
-void ComputeGradients_int(unsigned char *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float *gaussderiv_kernel, int kernel_deriv_width, unsigned char *gradx, unsigned char *grady);
-void ComputeGradients(float *img, int ncols, int nrows, float *gauss_kernel, int kernel_width, float *gaussderiv_kernel, int kernel_deriv_width, float * gradx, float *grady);
-
-float interpolate(float x, float y, float *img, int ncols, int nrows);
-void computeIntensityDifference(float *img1, float *img2, int ncols, int nrows, float x1, float y1, float x2, float y2, int width, int height, float *imgdiff);
-void computeGradientSum(float *gradx1, float *grady1,float *gradx2, float *grady2, int ncols, int nrows, float x1, float y1, float x2, float y2, int width, int height, float *gradx, float *grady);
-void compute2by2GradientMatrix(float *gradx, float *grady, int width, int height, float *gxx, float *gxy, float *gyy);
-void compute2by1ErrorVector(float *imgdiff, float *gradx,float *grady, int width, int height, float step_factor, float *ex, float *ey);
-int solveEquation(float gxx, float gxy, float gyy, float ex, float ey, float small, float *dx, float *dy);
-float sumAbsFloatWindow(float *fw, int width, int height);
-int trackFeature(float x1, float y1, float *x2, float *y2, float *img1, float *gradx1, float *grady1, float *img2, float *gradx2, float *grady2, int ncols, int nrows, int width, int height, float step_factor, int max_iterations, float small, float th, float max_residue);
-
-int opticFlowLKPyramidal(unsigned char **new_gray_buf, unsigned char **old_gray_buf, int nLevels, int subsampling, int* p_x, int* p_y, int n_found_points, int imW, int imH, int* new_x, int* new_y, int *flow_point, int* status, int half_window_size, int max_iterations);
+void OFfilter(float *OFx, float *OFy, float dx, float dy, int count, int OF_FilterType);
 #endif
