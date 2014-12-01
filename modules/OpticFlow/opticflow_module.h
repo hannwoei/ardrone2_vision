@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014
+ * Copyright (C) 2014 Hann Woei Ho
  *
  * This file is part of Paparazzi.
  *
@@ -19,7 +19,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
-/**
+/*
  * @file paparazzi/sw/ext/ardrone2_vision/modules/OpticFlow/opticflow_module.h
  * @brief optical-flow based hovering for Parrot AR.Drone 2.0
  *

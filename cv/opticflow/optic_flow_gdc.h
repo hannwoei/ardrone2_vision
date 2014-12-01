@@ -19,6 +19,13 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/*
+ * @file paparazzi/sw/ext/ardrone2_vision/cv/opticflow/optic_flow_gdc.h
+ * @brief optical-flow based hovering for Parrot AR.Drone 2.0
+ *
+ * Sensors from vertical camera and IMU of Parrot AR.Drone 2.0
+ */
+
 #ifndef OPTIC
 #define OPTIC
 void multiplyImages(int* ImA, int* ImB, int* ImC, int width, int height);

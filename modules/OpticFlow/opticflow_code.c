@@ -19,6 +19,13 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/*
+ * @file paparazzi/sw/ext/ardrone2_vision/modules/OpticFlow/opticflow_code.c
+ * @brief optical-flow based hovering for Parrot AR.Drone 2.0
+ *
+ * Sensors from vertical camera and IMU of Parrot AR.Drone 2.0
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 

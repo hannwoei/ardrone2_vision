@@ -19,6 +19,12 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/*
+ * @file paparazzi/sw/ext/ardrone2_vision/modules/OpticFlow/hover_stabilization.h
+ * @brief optical-flow based hovering for Parrot AR.Drone 2.0
+ *
+ * Sensors from vertical camera and IMU of Parrot AR.Drone 2.0
+ */
 
 #ifndef HOVER_STABILIZATION_H_
 #define HOVER_STABILIZATION_H_
