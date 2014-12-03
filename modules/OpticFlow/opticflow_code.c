@@ -252,6 +252,7 @@ void my_plugin_run(unsigned char *frame)
 	dx_sum = 0.0;
 	dy_sum = 0.0;
 	int dx_trans = 0, dy_trans = 0;
+	int sub_flow = 100;
 
 	// Optical Flow Computation
 	for(int i=0; i<flow_count; i++)
@@ -260,8 +261,8 @@ void my_plugin_run(unsigned char *frame)
 		dy[i] = new_y[i] - y[i];
 
 #ifdef FLOW_DEROTATION
-		dx_trans = (dx[i] - diff_roll);
-		dy_trans = (dy[i] - diff_pitch);
+		dx_trans = (dx[i]*sub_flow - diff_roll*sub_flow);
+		dy_trans = (dy[i]*sub_flow - diff_pitch*sub_flow);
 
 		if((dx_trans<=0) != (dx[i]<=0))
 		{
@@ -298,8 +299,8 @@ void my_plugin_run(unsigned char *frame)
 		dy_sum = 0.0;
 	}
 
-	OFx_trans = dx_sum;
-	OFy_trans = dy_sum;
+	OFx_trans = dx_sum/sub_flow;
+	OFy_trans = dy_sum/sub_flow;
 
 	// Average Filter
 	OFfilter(&OFx, &OFy, OFx_trans, OFy_trans, flow_count, 1);
@@ -313,8 +314,8 @@ void my_plugin_run(unsigned char *frame)
 
 //	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
 //	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
-	Velx = OFy*cam_h*FPS/Fy_ARdrone;
-	Vely = -OFx*cam_h*FPS/Fx_ARdrone;
+	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.1;
+	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
 
 	// **********************************************************************************************************************
 	// Next Loop Preparation
