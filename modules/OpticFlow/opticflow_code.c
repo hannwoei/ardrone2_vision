@@ -238,14 +238,49 @@ void my_plugin_run(unsigned char *frame)
 		}
 	}
 
+	// Flow Derotation
+	curr_pitch = stateGetNedToBodyEulers_f()->theta;
+	curr_roll = stateGetNedToBodyEulers_f()->phi;
+	curr_yaw = stateGetNedToBodyEulers_f()->psi;
+
+	diff_pitch = (curr_pitch - prev_pitch)*imgHeight/FOV_H;
+	diff_roll = (curr_roll - prev_roll)*imgWidth/FOV_W;
+
+	prev_pitch = curr_pitch;
+	prev_roll = curr_roll;
+
 	dx_sum = 0.0;
 	dy_sum = 0.0;
+	int dx_trans = 0, dy_trans = 0;
 
 	// Optical Flow Computation
 	for(int i=0; i<flow_count; i++)
 	{
 		dx[i] = new_x[i] - x[i];
 		dy[i] = new_y[i] - y[i];
+
+#ifdef FLOW_DEROTATION
+		dx_trans = (dx[i] - diff_roll);
+		dy_trans = (dy[i] - diff_pitch);
+
+		if((dx_trans<=0) != (dx[i]<=0))
+		{
+			dx[i] = 0;
+		}
+		else
+		{
+			dx[i] = dx_trans;
+		}
+
+		if((dy_trans<=0) != (dy[i]<=0))
+		{
+			dy[i] = 0;
+		}
+		else
+		{
+			dy[i] = dy_trans;
+		}
+#endif
 	}
 
 	// Median Filter
@@ -263,38 +298,8 @@ void my_plugin_run(unsigned char *frame)
 		dy_sum = 0.0;
 	}
 
-	// Flow Derotation
-	curr_pitch = stateGetNedToBodyEulers_f()->theta;
-	curr_roll = stateGetNedToBodyEulers_f()->phi;
-	curr_yaw = stateGetNedToBodyEulers_f()->psi;
-
-	diff_pitch = (curr_pitch - prev_pitch)*imgHeight/FOV_H;
-	diff_roll = (curr_roll - prev_roll)*imgWidth/FOV_W;
-
-	prev_pitch = curr_pitch;
-	prev_roll = curr_roll;
-
-#ifdef FLOW_DEROTATION
-	if(flow_count)
-	{
-		OFx_trans = dx_sum - diff_roll;
-		OFy_trans = dy_sum - diff_pitch;
-
-		if((OFx_trans<=0) != (dx_sum<=0))
-		{
-			OFx_trans = 0;
-			OFy_trans = 0;
-		}
-	}
-	else
-	{
-		OFx_trans = dx_sum;
-		OFy_trans = dy_sum;
-	}
-#else
 	OFx_trans = dx_sum;
 	OFy_trans = dy_sum;
-#endif
 
 	// Average Filter
 	OFfilter(&OFx, &OFy, OFx_trans, OFy_trans, flow_count, 1);
@@ -306,8 +311,10 @@ void my_plugin_run(unsigned char *frame)
 		cam_h = 1;
 	#endif
 
-	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
-	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
+//	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
+//	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
+	Velx = OFy*cam_h*FPS/Fy_ARdrone;
+	Vely = -OFx*cam_h*FPS/Fx_ARdrone;
 
 	// **********************************************************************************************************************
 	// Next Loop Preparation
