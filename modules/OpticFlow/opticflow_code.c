@@ -92,6 +92,11 @@ struct FloatVect3 V_Ned;
 struct FloatRMat Rmat_Ned2Body;
 struct FloatVect3 V_body;
 
+// Flow fitting
+float mean_tti, median_tti, d_heading, d_pitch, divergence_error,divergence,
+      z_x, z_y, three_dimensionality, POE_x, POE_y;
+int *n_inlier_minu, *n_inlier_minv, DIV_FILTER = 0;
+
 // Called by plugin
 void my_plugin_init(void)
 {
@@ -106,6 +111,8 @@ void my_plugin_init(void)
 	status = (int *) calloc(MAX_COUNT,sizeof(int));
 	dx = (int *) calloc(MAX_COUNT,sizeof(int));
 	dy = (int *) calloc(MAX_COUNT,sizeof(int));
+	n_inlier_minu = (int *)calloc(1,sizeof(int));
+	n_inlier_minv = (int *)calloc(1,sizeof(int));
 	old_img_init = 1;
 	OFx = 0.0;
 	OFy = 0.0;
@@ -318,6 +325,21 @@ void my_plugin_run(unsigned char *frame)
 	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
 
 	// **********************************************************************************************************************
+	// Flow Field Fitting
+	// **********************************************************************************************************************
+    // compute divergence/ TTI
+	int USE_FITTING = 1;
+//	int USE_MEAN_3D = 0;
+//	int USE_MEDIAN_3D = 1;
+//	threshold_3D_low = 450.0;
+//	threshold_3D_high = 1000.0;
+
+	if(USE_FITTING == 1)
+	{
+		analyseTTI(&z_x, &z_y, &three_dimensionality, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, flow_count, imgWidth, imgHeight, &DIV_FILTER);
+	}
+
+	// **********************************************************************************************************************
 	// Next Loop Preparation
 	// **********************************************************************************************************************
 
@@ -327,6 +349,7 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 	// Downlink Message
 	// **********************************************************************************************************************
-	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &count);
+	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &flow_count);
+	DOWNLINK_SEND_OF_LAND(DefaultChannel, DefaultDevice, &z_x, &z_y, &three_dimensionality, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, &V_body.z, &cam_h);
 }
 
