@@ -1344,7 +1344,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		*d_pitch = (-(pv[2] + (imgWidth/2.0f) * pv[0] + (imgHeight/2.0f) * pv[1]));
 
 		//apply a moving average
-		int medianfilter = 1;
+		int medianfilter = 0;
 		int averagefilter = 0;
 		int butterworthfilter = 0;
 		int kalmanfilter = 0;
@@ -1473,10 +1473,9 @@ void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_
 			*d_pitch = 0;
 			return;
 		}
-		float pu[3], pv[3];
 
-		//float divergence_error;
-		float min_error_u, min_error_v;
+		float pu[3], pv[3], min_error_u, min_error_v;
+
 		fitLinearFlowField(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
 		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, DIV_FILTER);

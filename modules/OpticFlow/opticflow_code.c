@@ -93,9 +93,9 @@ struct FloatRMat Rmat_Ned2Body;
 struct FloatVect3 V_body;
 
 // Flow fitting
-float mean_tti, median_tti, d_heading, d_pitch, divergence_error,divergence,
-      z_x, z_y, three_dimensionality, POE_x, POE_y;
-int *n_inlier_minu, *n_inlier_minv, DIV_FILTER = 0;
+float mean_tti, median_tti, d_heading, d_pitch, divergence_error, divergence,
+      z_x, z_y, flatness, POE_x, POE_y, ground_divergence;
+int *n_inlier_minu, *n_inlier_minv, DIV_FILTER;
 
 // Called by plugin
 void my_plugin_init(void)
@@ -111,8 +111,6 @@ void my_plugin_init(void)
 	status = (int *) calloc(MAX_COUNT,sizeof(int));
 	dx = (int *) calloc(MAX_COUNT,sizeof(int));
 	dy = (int *) calloc(MAX_COUNT,sizeof(int));
-	n_inlier_minu = (int *)calloc(1,sizeof(int));
-	n_inlier_minv = (int *)calloc(1,sizeof(int));
 	old_img_init = 1;
 	OFx = 0.0;
 	OFy = 0.0;
@@ -130,6 +128,13 @@ void my_plugin_init(void)
 	OFy_trans = 0.0;
 	Velx = 0.0;
 	Vely = 0.0;
+
+	// Flow fitting
+	n_inlier_minu = (int *)calloc(1,sizeof(int));
+	n_inlier_minv = (int *)calloc(1,sizeof(int));
+	mean_tti = 0.0, median_tti = 0.0, d_heading = 0.0, d_pitch = 0.0, divergence_error = 0.0, divergence = 0.0,
+	z_x = 0.0, z_y = 0.0, flatness = 0.0, POE_x = 0.0, POE_y = 0.0 , ground_divergence = 0.0;
+	DIV_FILTER = 0;
 }
 
 void my_plugin_run(unsigned char *frame)
@@ -259,7 +264,7 @@ void my_plugin_run(unsigned char *frame)
 	dx_sum = 0.0;
 	dy_sum = 0.0;
 	int dx_trans = 0, dy_trans = 0;
-	int sub_flow = 100;
+	int sub_flow = 100; //100
 
 	// Optical Flow Computation
 	for(int i=0; i<flow_count; i++)
@@ -270,6 +275,8 @@ void my_plugin_run(unsigned char *frame)
 #ifdef FLOW_DEROTATION
 		dx_trans = (dx[i]*sub_flow - diff_roll*sub_flow);
 		dy_trans = (dy[i]*sub_flow - diff_pitch*sub_flow);
+		x[i] = x[i]*sub_flow;
+		y[i] = y[i]*sub_flow;
 
 		if((dx_trans<=0) != (dx[i]<=0))
 		{
@@ -336,7 +343,13 @@ void my_plugin_run(unsigned char *frame)
 
 	if(USE_FITTING == 1)
 	{
-		analyseTTI(&z_x, &z_y, &three_dimensionality, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, flow_count, imgWidth, imgHeight, &DIV_FILTER);
+		analyseTTI(&z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, flow_count, imgWidth, imgHeight, &DIV_FILTER);
+	}
+
+	// compute ground divergence (Only when OpticTrack is connected)
+	if(cam_h)
+	{
+		ground_divergence = V_body.z/cam_h;
 	}
 
 	// **********************************************************************************************************************
@@ -350,6 +363,6 @@ void my_plugin_run(unsigned char *frame)
 	// Downlink Message
 	// **********************************************************************************************************************
 	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &flow_count);
-	DOWNLINK_SEND_OF_LAND(DefaultChannel, DefaultDevice, &z_x, &z_y, &three_dimensionality, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, &V_body.z, &cam_h);
+	DOWNLINK_SEND_OF_LAND(DefaultChannel, DefaultDevice, &z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, &V_body.z, &cam_h);
 }
 
