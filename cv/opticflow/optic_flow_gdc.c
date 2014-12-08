@@ -1344,7 +1344,7 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		*d_pitch = (-(pv[2] + (imgWidth/2.0f) * pv[0] + (imgHeight/2.0f) * pv[1]));
 
 		//apply a moving average
-		int medianfilter = 0;
+		int medianfilter = 1;
 		int averagefilter = 0;
 		int butterworthfilter = 0;
 		int kalmanfilter = 0;
@@ -1368,10 +1368,10 @@ void extractInformationFromLinearFlowField(float *divergence, float *mean_tti, f
 		{
 			*DIV_FILTER = 2;
 			//apply a median filter
-			if (*divergence < 3.0 && *divergence > -3.0) {
+//			if (*divergence < 3.0 && *divergence > -3.0) {
 				div_buf[div_point] = *divergence;
 				div_point = (div_point+1) %15;
-			}
+//			}
 			quick_sort(div_buf,15);
 			*divergence  = div_buf[8];
 		}

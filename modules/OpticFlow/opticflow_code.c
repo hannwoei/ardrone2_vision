@@ -299,19 +299,19 @@ void my_plugin_run(unsigned char *frame)
 	}
 
 	// Median Filter
-	if(flow_count)
-	{
-		quick_sort_int(dx,flow_count); // 11
-		quick_sort_int(dy,flow_count); // 11
-
-		dx_sum = (float) dx[flow_count/2];
-		dy_sum = (float) dy[flow_count/2];
-	}
-	else
-	{
-		dx_sum = 0.0;
-		dy_sum = 0.0;
-	}
+//	if(flow_count)
+//	{
+//		quick_sort_int(dx,flow_count); // 11
+//		quick_sort_int(dy,flow_count); // 11
+//
+//		dx_sum = (float) dx[flow_count/2];
+//		dy_sum = (float) dy[flow_count/2];
+//	}
+//	else
+//	{
+//		dx_sum = 0.0;
+//		dy_sum = 0.0;
+//	}
 
 	OFx_trans = dx_sum/sub_flow;
 	OFy_trans = dy_sum/sub_flow;
