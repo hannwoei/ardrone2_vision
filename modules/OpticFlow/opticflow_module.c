@@ -31,7 +31,7 @@
 #include "opticflow_module.h"
 
 // Navigate Based On Vision
-#include "hover_stabilization.h"
+#include "opticflow_control.h"
 
 // Paparazzi
 #include "state.h" // for attitude

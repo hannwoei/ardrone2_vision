@@ -27,7 +27,7 @@
  */
 
 // Own Header
-#include "hover_stabilization.h"
+#include "opticflow_control.h"
 
 // Vision Data
 #include "opticflow_code.h"
@@ -64,6 +64,26 @@ float Vely_Int;
 #define CMD_OF_SAT	1500 // 40 deg = 2859.1851
 unsigned char saturateX = 0, saturateY = 0;
 unsigned int set_heading;
+
+#ifndef VISION_HOVER
+#define VISION_HOVER 0
+#endif
+
+#ifndef VISION_PHI_PGAIN
+#define VISION_PHI_PGAIN 0
+#endif
+
+#ifndef VISION_PHI_IGAIN
+#define VISION_PHI_IGAIN 0
+#endif
+
+#ifndef VISION_THETA_PGAIN
+#define VISION_THETA_PGAIN 0
+#endif
+
+#ifndef VISION_THETA_IGAIN
+#define VISION_THETA_IGAIN 0
+#endif
 
 void init_hover_stabilization_onvision()
 {

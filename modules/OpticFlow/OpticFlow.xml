@@ -27,7 +27,7 @@ $(TARGET).CXXFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread -D__USE
 
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
-$(TARGET).srcs += $(VISION_MODULE_FOLDER)/hover_stabilization.c
+$(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_control.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/optic_flow_gdc.c
       	$(TARGET).srcs += $(DIR_CV)/opticflow/nrutil.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/fast9/fastRosten.c
