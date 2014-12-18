@@ -69,7 +69,7 @@ int max_count = 25;
 #define MAX_COUNT 100
 
 // Corner Tracking
-int *new_x, *new_y, *status, *dx, *dy;
+int *new_x, *new_y, *status, *dx, *dy, *dx_copy, *dy_copy;
 int error_opticflow;
 int flow_count = 0;
 int remove_point;
@@ -111,6 +111,8 @@ void my_plugin_init(void)
 	status = (int *) calloc(MAX_COUNT,sizeof(int));
 	dx = (int *) calloc(MAX_COUNT,sizeof(int));
 	dy = (int *) calloc(MAX_COUNT,sizeof(int));
+	dx_copy = (int *) calloc(MAX_COUNT,sizeof(int));
+	dy_copy = (int *) calloc(MAX_COUNT,sizeof(int));
 	old_img_init = 1;
 	OFx = 0.0;
 	OFy = 0.0;
@@ -296,22 +298,25 @@ void my_plugin_run(unsigned char *frame)
 			dy[i] = dy_trans;
 		}
 #endif
+		// copy dx and dy for sorting in Median Filter
+		dx_copy[i] = dx[i];
+		dy_copy[i] = dy[i];
 	}
 
 	// Median Filter
-//	if(flow_count)
-//	{
-//		quick_sort_int(dx,flow_count); // 11
-//		quick_sort_int(dy,flow_count); // 11
-//
-//		dx_sum = (float) dx[flow_count/2];
-//		dy_sum = (float) dy[flow_count/2];
-//	}
-//	else
-//	{
-//		dx_sum = 0.0;
-//		dy_sum = 0.0;
-//	}
+	if(flow_count)
+	{
+		quick_sort_int(dx_copy,flow_count); // 11
+		quick_sort_int(dy_copy,flow_count); // 11
+
+		dx_sum = (float) dx_copy[flow_count/2];
+		dy_sum = (float) dy_copy[flow_count/2];
+	}
+	else
+	{
+		dx_sum = 0.0;
+		dy_sum = 0.0;
+	}
 
 	OFx_trans = dx_sum/sub_flow;
 	OFy_trans = dy_sum/sub_flow;
@@ -328,8 +333,19 @@ void my_plugin_run(unsigned char *frame)
 
 //	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
 //	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
-	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.1;
-	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
+//	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.1;
+//	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
+	if(flow_count)
+	{
+		Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.1;
+		Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
+	}
+	else
+	{
+		Velx = 0.0;
+		Vely = 0.0;
+	}
+
 
 	// **********************************************************************************************************************
 	// Flow Field Fitting

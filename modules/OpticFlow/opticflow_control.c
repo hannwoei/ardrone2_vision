@@ -70,19 +70,19 @@ unsigned int set_heading;
 #endif
 
 #ifndef VISION_PHI_PGAIN
-#define VISION_PHI_PGAIN 0
+#define VISION_PHI_PGAIN 500
 #endif
 
 #ifndef VISION_PHI_IGAIN
-#define VISION_PHI_IGAIN 0
+#define VISION_PHI_IGAIN 10
 #endif
 
 #ifndef VISION_THETA_PGAIN
-#define VISION_THETA_PGAIN 0
+#define VISION_THETA_PGAIN 500
 #endif
 
 #ifndef VISION_THETA_IGAIN
-#define VISION_THETA_IGAIN 0
+#define VISION_THETA_IGAIN 10
 #endif
 
 void init_hover_stabilization_onvision()
