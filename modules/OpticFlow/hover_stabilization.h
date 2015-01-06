@@ -36,6 +36,8 @@ void run_hover_stabilization_onvision(void);
 void run_opticflow_hover(void);
 
 extern bool activate_opticflow_hover;
+extern float vision_desired_vx;
+extern float vision_desired_vy;
 extern int32_t vision_phi_pgain;
 extern int32_t vision_phi_igain;
 extern int32_t vision_theta_pgain;

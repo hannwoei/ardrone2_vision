@@ -49,6 +49,8 @@
 #error "ALL control gains have to be positive!!!"
 #endif
 bool activate_opticflow_hover;
+float vision_desired_vx;
+float vision_desired_vy;
 int32_t vision_phi_pgain;
 int32_t vision_phi_igain;
 int32_t vision_theta_pgain;
@@ -60,6 +62,8 @@ struct Int32Eulers cmd_euler;
 // Hover Stabilization
 float Velx_Int;
 float Vely_Int;
+float Error_Velx;
+float Error_Vely;
 
 #define CMD_OF_SAT	1500 // 40 deg = 2859.1851
 unsigned char saturateX = 0, saturateY = 0;
@@ -74,9 +78,13 @@ void init_hover_stabilization_onvision()
 	vision_phi_igain = VISION_PHI_IGAIN;
 	vision_theta_pgain = VISION_THETA_PGAIN;
 	vision_theta_igain = VISION_THETA_IGAIN;
+	vision_desired_vx = VISION_DESIRED_VX;
+	vision_desired_vy = VISION_DESIRED_VY;
 
 	set_heading = 1;
 
+	Error_Velx = 0;
+	Error_Vely = 0;
 	Velx_Int = 0;
 	Vely_Int = 0;
 }
@@ -96,11 +104,22 @@ void run_hover_stabilization_onvision(void)
 
 void run_opticflow_hover(void)
 {
+	if(flow_count)
+	{
+		Error_Velx = Velx - vision_desired_vx;
+		Error_Vely = Vely - vision_desired_vy;
+	}
+	else
+	{
+		Error_Velx = 0;
+		Error_Vely = 0;
+	}
+
 	if(saturateX==0)
 	{
 		if(activate_opticflow_hover==TRUE)
 		{
-			Velx_Int += vision_theta_igain*Velx;
+			Velx_Int += vision_theta_igain*Error_Velx;
 		}
 		else
 		{
@@ -111,7 +130,7 @@ void run_opticflow_hover(void)
 	{
 		if(activate_opticflow_hover==TRUE)
 		{
-			Vely_Int += vision_phi_igain*Vely;
+			Vely_Int += vision_phi_igain*Error_Vely;
 		}
 		else
 		{
@@ -127,8 +146,8 @@ void run_opticflow_hover(void)
 
 	if(activate_opticflow_hover==TRUE)
 	{
-		cmd_euler.phi =  - (vision_phi_pgain*Vely + Vely_Int);
-		cmd_euler.theta =  (vision_theta_pgain*Velx + Velx_Int);
+		cmd_euler.phi =  - (vision_phi_pgain*Error_Vely + Vely_Int);
+		cmd_euler.theta =  (vision_theta_pgain*Error_Velx + Velx_Int);
 	}
 	else
 	{

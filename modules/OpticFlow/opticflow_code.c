@@ -306,8 +306,16 @@ void my_plugin_run(unsigned char *frame)
 		cam_h = 1;
 	#endif
 
-	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
-	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
+	if(flow_count)
+	{
+		Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
+		Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
+	}
+	else
+	{
+		Velx = 0.0;
+		Vely = 0.0;
+	}
 
 	// **********************************************************************************************************************
 	// Next Loop Preparation
