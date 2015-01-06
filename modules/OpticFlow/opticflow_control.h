@@ -32,13 +32,17 @@
 #include <std.h>
 
 void init_hover_stabilization_onvision(void);
+void init_land_guidance_onvision(void);
 void run_hover_stabilization_onvision(void);
 void run_opticflow_hover(void);
+void run_opticflow_land(void);
 
 extern bool activate_opticflow_hover;
 extern int32_t vision_phi_pgain;
 extern int32_t vision_phi_igain;
 extern int32_t vision_theta_pgain;
 extern int32_t vision_theta_igain;
+extern float vision_land_pgain;
+extern float vision_div_const;
 
 #endif /* HOVER_STABILIZATION_H_ */

@@ -77,6 +77,9 @@ void opticflow_module_init(void)
 	// Stabilization Code Initialization
 	init_hover_stabilization_onvision();
 
+	// Landing Code Initialization
+	init_land_guidance_onvision();
+
 	// Frame Rate Initialization
 	FPS = 0.0;
 	timestamp=0;

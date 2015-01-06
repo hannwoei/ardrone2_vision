@@ -37,6 +37,9 @@
 #include "firmwares/rotorcraft/stabilization/stabilization_attitude.h"
 #include "autopilot.h"
 
+// Landing
+#include "firmwares/rotorcraft/guidance/guidance_v.h"
+
 // Downlink
 #include "subsystems/datalink/downlink.h"
 
@@ -60,6 +63,12 @@ struct Int32Eulers cmd_euler;
 // Hover Stabilization
 float Velx_Int;
 float Vely_Int;
+
+// Land with divergence
+float div_err;
+float vision_div_const;
+float vision_land_pgain;
+int land_guidance_threshold;
 
 #define CMD_OF_SAT	1500 // 40 deg = 2859.1851
 unsigned char saturateX = 0, saturateY = 0;
@@ -85,6 +94,14 @@ unsigned int set_heading;
 #define VISION_THETA_IGAIN 10
 #endif
 
+#ifndef VISION_DIV_CONST
+#define VISION_DIV_CONST 0
+#endif
+
+#ifndef VISION_LAND_PGAIN
+#define VISION_LAND_PGAIN 0
+#endif
+
 void init_hover_stabilization_onvision()
 {
 	INT_EULERS_ZERO(cmd_euler);
@@ -101,11 +118,23 @@ void init_hover_stabilization_onvision()
 	Vely_Int = 0;
 }
 
+void init_land_guidance_onvision()
+{
+	div_err = 0.0;
+	vision_div_const = VISION_DIV_CONST;
+	vision_land_pgain = VISION_LAND_PGAIN;
+	land_guidance_threshold = (int) (1.0/0.0000019);
+}
+
 void run_hover_stabilization_onvision(void)
 {
 	if(autopilot_mode == AP_MODE_VISION_HOVER)
 	{
 		run_opticflow_hover();
+	}
+	else if(autopilot_mode == AP_MODE_HOVER_CLIMB)
+	{
+		run_opticflow_land();
 	}
 	else
 	{
@@ -164,4 +193,26 @@ void run_opticflow_hover(void)
 
 	stabilization_attitude_set_rpy_setpoint_i(&cmd_euler);
 	DOWNLINK_SEND_VISION_STABILIZATION(DefaultChannel, DefaultDevice, &Velx, &Vely, &Velx_Int, &Vely_Int, &cmd_euler.phi, &cmd_euler.theta);
+}
+
+void run_opticflow_land(void)
+{
+
+	int USE_GROUND_DIVERGENCE = 0;
+
+	if(USE_GROUND_DIVERGENCE == 1)
+	{
+
+	}
+	else
+	{
+		div_err = vision_div_const-divergence;
+	}
+
+	guidance_v_zd_sp = guidance_v_zd_sp + ((int)(vision_land_pgain*div_err/0.0000019));
+
+	if(guidance_v_zd_sp > land_guidance_threshold) guidance_v_zd_sp = land_guidance_threshold;
+	if(guidance_v_zd_sp < -land_guidance_threshold) guidance_v_zd_sp = -land_guidance_threshold;
+
+	DOWNLINK_SEND_VISION_LAND(DefaultChannel, DefaultDevice, &guidance_v_zd_sp, &vision_div_const, &div_err, &vision_land_pgain, &ground_divergence);
 }

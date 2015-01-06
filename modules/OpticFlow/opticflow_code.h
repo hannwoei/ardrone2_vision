@@ -38,6 +38,8 @@ extern float Velx, Vely;
 extern int count;
 extern int flow_count;
 extern struct FloatVect3 V_body;
+extern float divergence;
+extern float ground_divergence;
 
 // Called by plugin
 void my_plugin_init(void);
