@@ -40,6 +40,12 @@
 // Paparazzi Data
 #include "subsystems/ins/ins_int.h"
 #include "subsystems/imu.h"
+#include "subsystems/gps.h"
+
+// Waypoints
+#include "navigation.h"
+#include "generated/flight_plan.h"
+struct EnuCoor_i waypoint_ob1;
 
 // Downlink
 #include "subsystems/datalink/downlink.h"
@@ -141,6 +147,13 @@ void my_plugin_init(void)
 
 void my_plugin_run(unsigned char *frame)
 {
+#ifdef VISION_OBSTACLE
+	// update obstacle waypoint
+	enu_of_ecef_pos_i(&waypoint_ob1, &state.ned_origin_i, &obstacle.ecef_pos);
+
+	nav_move_waypoint(WP_ob1, &waypoint_ob1);
+#endif
+
 	if(old_img_init == 1)
 	{
 		memcpy(prev_frame,frame,imgHeight*imgWidth*2);
@@ -328,7 +341,7 @@ void my_plugin_run(unsigned char *frame)
 	#ifdef USE_SONAR
 		cam_h = ins_impl.sonar_z;
 	#else
-		cam_h = 1;
+		cam_h = stateGetPositionEnu_f()->z;
 	#endif
 
 //	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
@@ -379,6 +392,11 @@ void my_plugin_run(unsigned char *frame)
 	// Downlink Message
 	// **********************************************************************************************************************
 	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &flow_count);
-	DOWNLINK_SEND_OF_LAND(DefaultChannel, DefaultDevice, &z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, &V_body.z, &cam_h);
+#ifdef VISION_OBSTACLE
+	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &d_heading, &d_pitch, &V_body.z, &cam_h, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z, &curr_pitch, &curr_roll, &curr_yaw, &waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
+#else
+	DOWNLINK_SEND_OF_LAND(DefaultChannel, DefaultDevice, &z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &d_heading, &d_pitch, &V_body.z, &cam_h, &imu.accel.x, &imu.accel.y, &imu.accel.z);
+#endif
+	// rotation angle, height, obstacle position (measured size),
 }
 

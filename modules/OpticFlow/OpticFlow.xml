@@ -15,6 +15,8 @@
   <makefile>
     <define name="ARDRONE_VIDEO_PORT" value="2002" />
     <define name="USE_ARDRONE_VIDEO" />
+    <define name="VISION_OBSTACLE" />
+    <define name="OBSTACLE_ID" value="111" />
       <raw>
 
 include $(PAPARAZZI_HOME)/sw/ext/ardrone2_vision/Makefile.paths
@@ -29,7 +31,7 @@ $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_module.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_code.c
 $(TARGET).srcs += $(VISION_MODULE_FOLDER)/opticflow_control.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/optic_flow_gdc.c
-      	$(TARGET).srcs += $(DIR_CV)/opticflow/nrutil.c
+$(TARGET).srcs += $(DIR_CV)/opticflow/nrutil.c
 $(TARGET).srcs += $(DIR_CV)/opticflow/fast9/fastRosten.c
 $(TARGET).srcs += $(DIR_CV)/encoding/jpeg.c
 $(TARGET).srcs += $(DIR_CV)/encoding/rtp.c
@@ -39,8 +41,8 @@ $(TARGET).srcs += $(DIR_LIB)/v4l/video.c
 $(TARGET).CFLAGS += -I$(DIR_MODULES) -I$(DIR_CV) -I$(DIR_LIB) -pthread
 $(TARGET).LDFLAGS += -pthread -lrt -static
 
-all:
-	make -C $(VISION_MODULE_FOLDER)/visionresult/
+# all:
+#	make -C $(VISION_MODULE_FOLDER)/visionresult/
 
     </raw>
   </makefile>
