@@ -100,7 +100,8 @@ struct FloatVect3 V_body;
 
 // Flow fitting
 float mean_tti, median_tti, d_heading, d_pitch, divergence_error, divergence,
-      z_x, z_y, flatness, POE_x, POE_y, ground_divergence;
+      z_x, z_y, flatness, POE_x, POE_y, ground_divergence,  div_buf_3D[30], div_avg_3D;
+unsigned int mov_block_3D, div_point_3D;
 int *n_inlier_minu, *n_inlier_minv, DIV_FILTER;
 
 // Called by plugin
@@ -143,10 +144,14 @@ void my_plugin_init(void)
 	mean_tti = 0.0, median_tti = 0.0, d_heading = 0.0, d_pitch = 0.0, divergence_error = 0.0, divergence = 0.0,
 	z_x = 0.0, z_y = 0.0, flatness = 0.0, POE_x = 0.0, POE_y = 0.0 , ground_divergence = 0.0;
 	DIV_FILTER = 0;
+	div_point_3D = 0, div_avg_3D = 0.0, mov_block_3D = 6;
 }
 
 void my_plugin_run(unsigned char *frame)
 {
+//	// set heading
+//	nav_set_heading_rad(5.73515192); // 328.6 deg = 5.73515192 rad
+
 #ifdef VISION_OBSTACLE
 	// update obstacle waypoint
 	enu_of_ecef_pos_i(&waypoint_ob1, &state.ned_origin_i, &obstacle.ecef_pos);
@@ -365,6 +370,8 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
     // compute divergence/ TTI
 	int USE_FITTING = 1;
+	int USE_MEAN_3D = 0;
+	int USE_MEDIAN_3D = 1;
 //	int USE_MEAN_3D = 0;
 //	int USE_MEDIAN_3D = 1;
 //	threshold_3D_low = 450.0;
@@ -373,6 +380,31 @@ void my_plugin_run(unsigned char *frame)
 	if(USE_FITTING == 1)
 	{
 		analyseTTI(&z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, flow_count, imgWidth, imgHeight, &DIV_FILTER);
+
+			if (USE_MEAN_3D == 1)
+			{
+
+				div_buf_3D[div_point_3D] = flatness;
+				div_point_3D = (div_point_3D+1) %mov_block_3D; // index starts from 0 to mov_block
+				div_avg_3D = 0.0;
+				for (int im=0;im<mov_block_3D;im++)
+				{
+					div_avg_3D+=div_buf_3D[im];
+				}
+				flatness = (float) div_avg_3D/ mov_block_3D;
+			}
+			else if(USE_MEDIAN_3D == 1)
+			{
+				div_buf_3D[div_point_3D] = flatness;
+				div_point_3D = (div_point_3D+1) %mov_block_3D;
+				quick_sort(div_buf_3D,mov_block_3D);
+				flatness = div_buf_3D[mov_block_3D/2];
+			}
+			else
+			{
+
+			}
+
 	}
 
 	// compute ground divergence (Only when OpticTrack is connected)
@@ -391,9 +423,13 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 	// Downlink Message
 	// **********************************************************************************************************************
-	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &flow_count);
+//	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &flow_count);
 #ifdef VISION_OBSTACLE
-	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &d_heading, &d_pitch, &V_body.z, &cam_h, &stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z, &curr_pitch, &curr_roll, &curr_yaw, &waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
+	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &POE_x, &POE_y,
+			&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
+			&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
+			&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
+			&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
 #else
 	DOWNLINK_SEND_OF_LAND(DefaultChannel, DefaultDevice, &z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &d_heading, &d_pitch, &V_body.z, &cam_h, &imu.accel.x, &imu.accel.y, &imu.accel.z);
 #endif

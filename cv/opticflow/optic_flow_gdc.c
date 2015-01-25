@@ -1471,6 +1471,7 @@ void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_
 			*median_tti = *mean_tti;
 			*d_heading = 0;
 			*d_pitch = 0;
+			*three_dimensionality = 0;
 			return;
 		}
 
