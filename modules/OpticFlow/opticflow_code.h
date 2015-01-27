@@ -29,6 +29,8 @@
 #ifndef _OPT_FL_LAND_H
 #define _OPT_FL_LAND_H
 
+#include "math/pprz_algebra_int.h"
+
 // Settable by pluging
 extern unsigned int imgWidth, imgHeight;
 extern unsigned int verbose;
@@ -40,6 +42,13 @@ extern int flow_count;
 extern struct FloatVect3 V_body;
 extern float divergence;
 extern float ground_divergence;
+
+// Appearance Landing
+extern bool_t train_dictionary;
+extern bool_t extract_distribution;
+
+// Snapshot
+extern bool_t snapshot;
 
 // Called by plugin
 void my_plugin_init(void);

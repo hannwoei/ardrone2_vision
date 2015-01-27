@@ -104,6 +104,31 @@ float mean_tti, median_tti, d_heading, d_pitch, divergence_error, divergence,
 unsigned int mov_block_3D, div_point_3D;
 int *n_inlier_minu, *n_inlier_minv, DIV_FILTER;
 
+// Appearance Landing
+#define APPEARANCE_LANDING
+#ifdef APPEARANCE_LANDING
+float **** dictionary, alpha, *word_distribution, flatness_appearance;
+int n_words, patch_size, n_samples, learned_samples, n_samples_image, filled, WORDS, save_dictionary, RANDOM_SAMPLES, border_width, border_height;
+#endif
+
+// snapshot
+char filename[100];
+int i_frame;
+bool_t train_dictionary, extract_distribution, snapshot;
+unsigned int land_distribution;
+
+#ifndef VISION_TRAIN_DICTIONARY
+#define VISION_TRAIN_DICTIONARY FALSE
+#endif
+
+#ifndef VISION_EXTRACT_DISTRIBUTION
+#define VISION_EXTRACT_DISTRIBUTION FALSE
+#endif
+
+#ifndef VISION_SNAPSHOT
+#define VISION_SNAPSHOT FALSE
+#endif
+
 // Called by plugin
 void my_plugin_init(void)
 {
@@ -145,6 +170,39 @@ void my_plugin_init(void)
 	z_x = 0.0, z_y = 0.0, flatness = 0.0, POE_x = 0.0, POE_y = 0.0 , ground_divergence = 0.0;
 	DIV_FILTER = 0;
 	div_point_3D = 0, div_avg_3D = 0.0, mov_block_3D = 6;
+
+	// Appearance Landing
+#ifdef APPEARANCE_LANDING
+	n_words = 30, patch_size = 6, n_samples = 200000, learned_samples = 0, filled = 0, save_dictionary = 1, RANDOM_SAMPLES = 1, border_width = 80, border_height = 60;
+	alpha = 0.5, word_distribution = (float*)calloc(n_words,sizeof(float)), flatness_appearance = 0.0;
+	n_samples_image = 50; // 100: train dictionary
+	WORDS = 0; // 0: train a dictionary
+
+	// create a dictionary
+	dictionary = (float ****)calloc(n_words,sizeof(float***));
+
+	for(int i = 0; i < n_words; i++)
+	{
+		dictionary[i] = (float ***)calloc(patch_size,sizeof(float **));
+
+		for(int j = 0; j < patch_size;j++)
+		{
+			dictionary[i][j] = (float **)calloc(patch_size,sizeof(float*));
+
+			for(int k = 0; k < patch_size; k++)
+			{
+				dictionary[i][j][k] = (float *)calloc(2,sizeof(float));
+			}
+		}
+	}
+#endif
+
+	// snapshot
+	i_frame = 0;
+	snapshot = VISION_SNAPSHOT;
+	train_dictionary = VISION_TRAIN_DICTIONARY; // initialize false
+	extract_distribution = VISION_EXTRACT_DISTRIBUTION;
+	land_distribution = 0;
 }
 
 void my_plugin_run(unsigned char *frame)
@@ -411,6 +469,140 @@ void my_plugin_run(unsigned char *frame)
 	if(cam_h)
 	{
 		ground_divergence = V_body.z/cam_h;
+	}
+
+	// **********************************************************************************************************************
+	// Appearance Landing
+	// **********************************************************************************************************************
+#ifdef APPEARANCE_LANDING
+	// Dictionary Training
+	if(!WORDS && train_dictionary)
+	{
+		DictionaryTrainingYUV(dictionary, frame, n_words, patch_size, &learned_samples, n_samples_image, alpha, imgWidth, imgHeight, &filled);
+	}
+
+	if(extract_distribution && !WORDS)
+	{
+		//load a dictionary
+		FILE *fdl;
+		fdl=fopen("/data/video/VisualWords3.dat", "r");
+
+		if(fdl == NULL)
+		{
+			perror("Error while opening the file.\n");
+		}
+		else
+		{
+			for(int i = 0; i < n_words; i++)
+			{
+				for(int j = 0; j < patch_size;j++)
+				{
+					for(int k = 0; k < patch_size; k++)
+					{
+						if(fscanf(fdl, "%f\n", &dictionary[i][j][k][0]) == EOF) break;
+						if(fscanf(fdl, "%f\n", &dictionary[i][j][k][1]) == EOF) break;
+					}
+				}
+			}
+			fclose(fdl);
+			WORDS = 1;
+			printf("load dictionary done!\n");
+		}
+	}
+
+	if(learned_samples >= n_samples && !WORDS)
+	{
+		printf("Done !!!\n");
+		WORDS = 1;
+		// lower learning rate
+		alpha = 0.0;
+
+		if(save_dictionary)
+		{
+//			printf("save dictionary\n");
+			//save a dictionary
+			FILE *fdd;
+			fdd=fopen("/data/video/VisualWords3.dat", "w");
+
+			if(fdd == NULL)
+			{
+				perror("Error while opening the file.\n");
+			}
+			else
+			{
+				// delete dictionary
+				for(int i = 0; i < n_words; i++)
+				{
+					for(int j = 0; j < patch_size;j++)
+					{
+						for(int k = 0; k < patch_size; k++)
+						{
+							fprintf(fdd, "%f\n",dictionary[i][j][k][0]);
+							fprintf(fdd, "%f\n",dictionary[i][j][k][1]);
+	//						free(dictionary[i][j][k]);
+						}
+	//					free(dictionary[i][j]);
+					}
+	//				free(dictionary[i]);
+				}
+	//			free(dictionary);
+				fclose(fdd);
+			}
+			save_dictionary = 0;
+		}
+	}
+
+	// flatness model
+	if(extract_distribution)
+	{
+		DistributionExtraction(dictionary, frame, word_distribution, n_words, patch_size, n_samples_image, RANDOM_SAMPLES, imgWidth, imgHeight, border_width, border_height);
+
+//		flatness_appearance = 2294.5
+//				+ word_distribution[0]*(-2145.1) + word_distribution[1]*(583.7) + word_distribution[2]*(-2166.2) + word_distribution[3]*(1624.4) + word_distribution[4]*(1012)
+//				+ word_distribution[5]*(-2860.2) + word_distribution[6]*(-790.6) + word_distribution[7]*(5165.1) + word_distribution[8]*(226.8) + word_distribution[9]*(-3481.1)
+//				+ word_distribution[10]*(-1765.4) + word_distribution[11]*(-3412) + word_distribution[12]*(-1787.9) + word_distribution[13]*(-2698.2) + word_distribution[14]*(67.6)
+//				+ word_distribution[15]*(-6578.4) + word_distribution[16]*(-2859.1) + word_distribution[17]*(-8525.5) + word_distribution[18]*(4740.1) + word_distribution[19]*(37066.1)
+//				+ word_distribution[20]*(-2455.2) + word_distribution[21]*(-459) + word_distribution[22]*(8448.4) + word_distribution[23]*(-2449) + word_distribution[24]*(-1939.3)
+//				+ word_distribution[25]*(-482.3) + word_distribution[26]*(-6793.7) + word_distribution[27]*(552.6) + word_distribution[28]*(-2314.5) + word_distribution[29]*(-1205.5);
+//
+//		if(flatness_appearance < 400.0)
+//		{
+//			land_distribution = 1;
+//		}
+//		else
+//		{
+//			land_distribution = 0;
+//		}
+
+		DOWNLINK_SEND_Distribution(DefaultChannel, DefaultDevice, &flatness
+								, &word_distribution[0], &word_distribution[1], &word_distribution[2], &word_distribution[3], &word_distribution[4]
+		                        , &word_distribution[5], &word_distribution[6], &word_distribution[7], &word_distribution[8], &word_distribution[9]
+		                        , &word_distribution[10], &word_distribution[11], &word_distribution[12], &word_distribution[13], &word_distribution[14]
+		                        , &word_distribution[15], &word_distribution[16], &word_distribution[17], &word_distribution[18], &word_distribution[19]
+		                        , &word_distribution[20], &word_distribution[21], &word_distribution[22], &word_distribution[23], &word_distribution[24]
+		                        , &word_distribution[25], &word_distribution[26], &word_distribution[27], &word_distribution[28], &word_distribution[29]);
+
+	}
+
+#endif
+
+	// **********************************************************************************************************************
+	// Save an image
+	// **********************************************************************************************************************
+	if(snapshot)
+	{
+		if(land_distribution)
+		{
+			sprintf(filename, "/data/video/safe_%d.dat", i_frame);
+			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+		}
+		else
+		{
+			sprintf(filename, "/data/video/unsafe_%d.dat", i_frame);
+			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+		}
+		snapshot = FALSE;
+		i_frame ++ ;
 	}
 
 	// **********************************************************************************************************************
