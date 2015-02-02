@@ -1483,6 +1483,8 @@ void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_
 
 		slopeEstimation(z_x, z_y, three_dimensionality, POE_x, POE_y, *d_heading, *d_pitch, pu, pv, min_error_u, min_error_v);
 
+		*three_dimensionality = *three_dimensionality/(count*2);
+
 }
 
 void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height, char filename[100])
@@ -1598,7 +1600,7 @@ void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_wo
 	}
 	else
 	{
-		printf("Learning\n");
+//		printf("Learning\n");
 		float *word_distances, ***p;
 		word_distances = (float *)calloc(n_clusters,sizeof(float));
 		p = (float ***)calloc(clustered_ps,sizeof(float**));
@@ -1702,7 +1704,7 @@ void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_wo
 
 }
 
-void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height, int border_width, int border_height)
+void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height, int border_width, int border_height, float *error_appearance)
 {
 	int i, j, s, word, c; //loop variables
 	int x, y;
@@ -1710,6 +1712,7 @@ void DistributionExtraction(float ****color_words, unsigned char *frame, float* 
 	int clustered_ps = patch_size; // use even number fo YUV image
 	int n_extracted_words = 0;
 	int FULL_SAMPLING;
+	*error_appearance = 0.0;
 
 	unsigned char *buf;
 
@@ -1805,6 +1808,9 @@ void DistributionExtraction(float ****color_words, unsigned char *frame, float* 
 			}
 		}
 
+		// compute sum of minimum distance (error in appearance)
+		*error_appearance = *error_appearance + min_dist;
+
 		// put the assignment in the histogram
 		word_distribution[assignment]++;
 
@@ -1852,6 +1858,8 @@ void DistributionExtraction(float ****color_words, unsigned char *frame, float* 
 		avg_p += word_distribution[i];
 	}
 	avg_p = avg_p /(float) n_clusters;
+
+	*error_appearance = *error_appearance /(float) n_clusters;
 
 //	if(FULL_SAMPLING)
 //	{

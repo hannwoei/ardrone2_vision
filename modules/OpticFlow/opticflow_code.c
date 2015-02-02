@@ -69,7 +69,7 @@ float OFx, OFy, dx_sum, dy_sum;
 #define Fy_ARdrone 348.5053
 
 // Corner Detection
-int *x, *y;
+int *x, *y, *x_copy, *y_copy;
 int count = 0;
 int max_count = 25;
 #define MAX_COUNT 100
@@ -107,8 +107,12 @@ int *n_inlier_minu, *n_inlier_minv, DIV_FILTER;
 // Appearance Landing
 #define APPEARANCE_LANDING
 #ifdef APPEARANCE_LANDING
-float **** dictionary, alpha, *word_distribution, flatness_appearance;
+float **** dictionary, alpha, *word_distribution, flatness_appearance, flatness_appearance2, appearance_uncertainty;
 int n_words, patch_size, n_samples, learned_samples, n_samples_image, filled, WORDS, save_dictionary, RANDOM_SAMPLES, border_width, border_height;
+float WR0, WR1, WR2, WR3, WR4, WR5, WR6, WR7, WR8, WR9, WR10, WR11, WR12, WR13, WR14, WR15, WR16, WR17, WR18, WR19, WR20, WR21, WR22, WR23, WR24, WR25,
+WR26, WR27, WR28, WR29, WR30;
+//float WR0_2, WR1_2, WR2_2, WR3_2, WR4_2, WR5_2, WR6_2, WR7_2, WR8_2, WR9_2, WR10_2, WR11_2, WR12_2, WR13_2, WR14_2, WR15_2, WR16_2, WR17_2, WR18_2, WR19_2, WR20_2,
+//WR21_2, WR22_2, WR23_2, WR24_2, WR25_2, WR26_2, WR27_2, WR28_2, WR29_2, WR30_2;
 #endif
 
 // snapshot
@@ -137,8 +141,10 @@ void my_plugin_init(void)
 	prev_frame = (unsigned char *) calloc(imgWidth*imgHeight*2,sizeof(unsigned char));
 	prev_gray_frame = (unsigned char *) calloc(imgWidth*imgHeight,sizeof(unsigned char));
 	x = (int *) calloc(MAX_COUNT,sizeof(int));
+	x_copy = (int *) calloc(MAX_COUNT,sizeof(int));
 	new_x = (int *) calloc(MAX_COUNT,sizeof(int));
 	y = (int *) calloc(MAX_COUNT,sizeof(int));
+	y_copy = (int *) calloc(MAX_COUNT,sizeof(int));
 	new_y = (int *) calloc(MAX_COUNT,sizeof(int));
 	status = (int *) calloc(MAX_COUNT,sizeof(int));
 	dx = (int *) calloc(MAX_COUNT,sizeof(int));
@@ -173,10 +179,11 @@ void my_plugin_init(void)
 
 	// Appearance Landing
 #ifdef APPEARANCE_LANDING
-	n_words = 30, patch_size = 6, n_samples = 200000, learned_samples = 0, filled = 0, save_dictionary = 1, RANDOM_SAMPLES = 1, border_width = 80, border_height = 60;
-	alpha = 0.5, word_distribution = (float*)calloc(n_words,sizeof(float)), flatness_appearance = 0.0;
+	n_words = 30, patch_size = 6, n_samples = 400000, learned_samples = 0, filled = 0, save_dictionary = 1, RANDOM_SAMPLES = 1, border_width = 80, border_height = 60;
+	alpha = 0.5, word_distribution = (float*)calloc(n_words,sizeof(float)), flatness_appearance = 0.0, flatness_appearance2 = 0.0;
 	n_samples_image = 50; // 100: train dictionary
 	WORDS = 0; // 0: train a dictionary
+	appearance_uncertainty = 0.0;
 
 	// create a dictionary
 	dictionary = (float ****)calloc(n_words,sizeof(float***));
@@ -195,6 +202,14 @@ void my_plugin_init(void)
 			}
 		}
 	}
+
+	WR0 = 0.0, WR1 = 0.0, WR2 = 0.0, WR3 = 0.0, WR4 = 0.0, WR5 = 0.0, WR6 = 0.0, WR7 = 0.0, WR8 = 0.0, WR9 = 0.0, WR10 = 0.0,
+	WR11 = 0.0, WR12 = 0.0, WR13 = 0.0, WR14 = 0.0, WR15 = 0.0, WR16 = 0.0, WR17 = 0.0, WR18 = 0.0, WR19 = 0.0, WR20 = 0.0,
+	WR21 = 0.0, WR22 = 0.0, WR23 = 0.0, WR24 = 0.0, WR25 = 0.0, WR26 = 0.0, WR27 = 0.0, WR28 = 0.0, WR29 = 0.0, WR30 = 0.0;
+
+//	WR0_2 = 0.0, WR1_2 = 0.0, WR2_2 = 0.0, WR3_2 = 0.0, WR4_2 = 0.0, WR5_2 = 0.0, WR6_2 = 0.0, WR7_2 = 0.0, WR8_2 = 0.0, WR9_2 = 0.0, WR10_2 = 0.0,
+//	WR11_2 = 0.0, WR12_2 = 0.0, WR13_2 = 0.0, WR14_2 = 0.0, WR15_2 = 0.0, WR16_2 = 0.0, WR17_2 = 0.0, WR18_2 = 0.0, WR19_2 = 0.0, WR20_2 = 0.0,
+//	WR21_2 = 0.0, WR22_2 = 0.0, WR23_2 = 0.0, WR24_2 = 0.0, WR25_2 = 0.0, WR26_2 = 0.0, WR27_2 = 0.0, WR28_2 = 0.0, WR29_2 = 0.0, WR30_2 = 0.0;
 #endif
 
 	// snapshot
@@ -353,8 +368,8 @@ void my_plugin_run(unsigned char *frame)
 #ifdef FLOW_DEROTATION
 		dx_trans = (dx[i]*sub_flow - diff_roll*sub_flow);
 		dy_trans = (dy[i]*sub_flow - diff_pitch*sub_flow);
-		x[i] = x[i]*sub_flow;
-		y[i] = y[i]*sub_flow;
+//		x[i] = x[i]*sub_flow;
+//		y[i] = y[i]*sub_flow;
 
 		if((dx_trans<=0) != (dx[i]<=0))
 		{
@@ -377,7 +392,15 @@ void my_plugin_run(unsigned char *frame)
 		// copy dx and dy for sorting in Median Filter
 		dx_copy[i] = dx[i];
 		dy_copy[i] = dy[i];
+		x_copy[i] = x[i];
+		y_copy[i] = y[i];
+		dx[i] = dy_copy[i]/sub_flow;
+		dy[i] = -dx_copy[i]/sub_flow;
+		x[i] = imgHeight/2 - y_copy[i];
+		y[i] = x_copy[i] - imgWidth/2;
+//		printf("(%d, %d) ",x[i],y[i]);
 	}
+//	printf("\n");
 
 	// Median Filter
 	if(flow_count)
@@ -478,6 +501,7 @@ void my_plugin_run(unsigned char *frame)
 	// Dictionary Training
 	if(!WORDS && train_dictionary)
 	{
+		n_samples_image = 100;
 		DictionaryTrainingYUV(dictionary, frame, n_words, patch_size, &learned_samples, n_samples_image, alpha, imgWidth, imgHeight, &filled);
 	}
 
@@ -508,6 +532,14 @@ void my_plugin_run(unsigned char *frame)
 			WORDS = 1;
 			printf("load dictionary done!\n");
 		}
+
+		WR0 = 48099, WR1 = -46842, WR2 = -46928, WR3 = -47082, WR4 = -46889, WR5 = -47530, WR6 = -46625, WR7 = -47127, WR8 = -47083, WR9 = -47162, WR10 = -47225,
+		WR11 = -47363, WR12 = -46966, WR13 = -47174, WR14 = -47015, WR15 = -46143, WR16 = -47118, WR17 = -47126, WR18 = -47235, WR19 = -47345, WR20 = -47044,
+		WR21 = -46892, WR22 = -47285, WR23 = -46936, WR24 = -47102, WR25 = -6692,	WR26 = -46994, WR27 = -46805, WR28 = -47011, WR29 = -47124, WR30 = -47048;
+
+//		WR0_2 = 51071, WR1_2 = -49796, WR2_2 = -49812, WR3_2 = -49935, WR4_2 = -49792, WR5_2 = -50474, WR6_2 = -49638, WR7_2 = -50056, WR8_2 = -49998, WR9_2 = -50072, WR10_2 = -50155,
+//		WR11_2 = -50274, WR12_2 = -49892, WR13_2 = -50049, WR14_2 = -49936, WR15_2 = -49184, WR16_2 = -50030, WR17_2 = -50038, WR18_2 = -50098, WR19_2 = -50251, WR20_2 = -49926,
+//		WR21_2 = -49734, WR22_2 = -50232, WR23_2 = -49847, WR24_2 = -50003, WR25_2 = -49509, WR26_2 = -49912, WR27_2 = -49705, WR28_2 = -49935, WR29_2 = -50038, WR30_2 = -49978;
 	}
 
 	if(learned_samples >= n_samples && !WORDS)
@@ -555,7 +587,33 @@ void my_plugin_run(unsigned char *frame)
 	// flatness model
 	if(extract_distribution)
 	{
-		DistributionExtraction(dictionary, frame, word_distribution, n_words, patch_size, n_samples_image, RANDOM_SAMPLES, imgWidth, imgHeight, border_width, border_height);
+		n_samples_image = 50;
+		DistributionExtraction(dictionary, frame, word_distribution, n_words, patch_size, n_samples_image, RANDOM_SAMPLES, imgWidth, imgHeight, border_width, border_height, &appearance_uncertainty);
+
+//		flatness_appearance = WR0
+//				+ word_distribution[0]*WR1 + word_distribution[1]*WR2 + word_distribution[2]*WR3 + word_distribution[3]*WR4 + word_distribution[4]*WR5
+//				+ word_distribution[5]*WR6 + word_distribution[6]*WR7 + word_distribution[7]*WR8 + word_distribution[8]*WR9 + word_distribution[9]*WR10
+//				+ word_distribution[10]*WR11 + word_distribution[11]*WR12 + word_distribution[12]*WR13 + word_distribution[13]*WR14 + word_distribution[14]*WR15
+//				+ word_distribution[15]*WR16 + word_distribution[16]*WR17 + word_distribution[17]*WR18 + word_distribution[18]*WR19 + word_distribution[19]*WR20
+//				+ word_distribution[20]*WR21 + word_distribution[21]*WR22 + word_distribution[22]*WR23 + word_distribution[23]*WR24 + word_distribution[24]*WR25
+//				+ word_distribution[25]*WR26 + word_distribution[26]*WR27 + word_distribution[27]*WR28 + word_distribution[28]*WR29 + word_distribution[29]*WR30;
+
+//		flatness_appearance2 = WR0_2
+//				+ word_distribution[0]*WR1_2 + word_distribution[1]*WR2_2 + word_distribution[2]*WR3_2 + word_distribution[3]*WR4_2 + word_distribution[4]*WR5_2
+//				+ word_distribution[5]*WR6_2 + word_distribution[6]*WR7_2 + word_distribution[7]*WR8_2 + word_distribution[8]*WR9_2 + word_distribution[9]*WR10_2
+//				+ word_distribution[10]*WR11_2 + word_distribution[11]*WR12_2 + word_distribution[12]*WR13_2 + word_distribution[13]*WR14_2 + word_distribution[14]*WR15_2
+//				+ word_distribution[15]*WR16_2 + word_distribution[16]*WR17_2 + word_distribution[17]*WR18_2 + word_distribution[18]*WR19_2 + word_distribution[19]*WR20_2
+//				+ word_distribution[20]*WR21_2 + word_distribution[21]*WR22_2 + word_distribution[22]*WR23_2 + word_distribution[23]*WR24_2 + word_distribution[24]*WR25_2
+//				+ word_distribution[25]*WR26_2 + word_distribution[26]*WR27_2 + word_distribution[27]*WR28_2 + word_distribution[28]*WR29_2 + word_distribution[29]*WR30_2;
+
+//		flatness_appearance = 42869
+//				+ word_distribution[0]*(-41943) + word_distribution[1]*(-41908) + word_distribution[2]*(-41932) + word_distribution[3]*(-41837) + word_distribution[4]*(-41990)
+//				+ word_distribution[5]*(-42006) + word_distribution[6]*(-41931) + word_distribution[7]*(-42106) + word_distribution[8]*(-41802) + word_distribution[9]*(-41945)
+//				+ word_distribution[10]*(-41966) + word_distribution[11]*(-42035) + word_distribution[12]*(-41730) + word_distribution[13]*(-41973) + word_distribution[14]*(-41866)
+//				+ word_distribution[15]*(-41744) + word_distribution[16]*(-41843) + word_distribution[17]*(-41949) + word_distribution[18]*(-42041) + word_distribution[19]*(-41818)
+//				+ word_distribution[20]*(-41786) + word_distribution[21]*(-42194) + word_distribution[22]*(-42003) + word_distribution[23]*(-42161) + word_distribution[24]*(-41849)
+//				+ word_distribution[25]*(-42364) + word_distribution[26]*(-41797) + word_distribution[27]*(-42065) + word_distribution[28]*(-41914) + word_distribution[29]*(-41848);
+
 
 //		flatness_appearance = 2294.5
 //				+ word_distribution[0]*(-2145.1) + word_distribution[1]*(583.7) + word_distribution[2]*(-2166.2) + word_distribution[3]*(1624.4) + word_distribution[4]*(1012)
@@ -617,7 +675,12 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 //	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &flow_count);
 #ifdef VISION_OBSTACLE
-	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &POE_x, &POE_y,
+//	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &POE_x, &POE_y,
+//			&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
+//			&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
+//			&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
+//			&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
+	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &flatness_appearance, &appearance_uncertainty,
 			&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
 			&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
 			&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
