@@ -133,6 +133,9 @@ unsigned int land_distribution;
 #define VISION_SNAPSHOT FALSE
 #endif
 
+FILE *fdata;
+int fdata_close =0;
+
 // Called by plugin
 void my_plugin_init(void)
 {
@@ -218,6 +221,8 @@ void my_plugin_init(void)
 	train_dictionary = VISION_TRAIN_DICTIONARY; // initialize false
 	extract_distribution = VISION_EXTRACT_DISTRIBUTION;
 	land_distribution = 0;
+
+	fdata=fopen("/data/video/usb0/fdata.dat", "w");
 }
 
 void my_plugin_run(unsigned char *frame)
@@ -649,18 +654,38 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 	if(snapshot)
 	{
-		if(land_distribution)
+//		if(land_distribution)
+//		{
+//			sprintf(filename, "/data/video/safe_%d.dat", i_frame);
+//			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+//		}
+//		else
+//		{
+//			sprintf(filename, "/data/video/unsafe_%d.dat", i_frame);
+//			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+//		}
+//		snapshot = FALSE;
+		sprintf(filename, "/data/video/usb0/image_%d.dat", i_frame);
+		saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+
+		if(fdata == NULL)
 		{
-			sprintf(filename, "/data/video/safe_%d.dat", i_frame);
-			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+			perror("Error while opening the file.\n");
 		}
 		else
 		{
-			sprintf(filename, "/data/video/unsafe_%d.dat", i_frame);
-			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+			fprintf(fdata, "%d %f %f %d %f %f %f %f\n",i_frame, FPS, flatness, flow_count, cam_h, curr_pitch, curr_roll, curr_yaw);
+			fdata_close = 1;
 		}
-		snapshot = FALSE;
 		i_frame ++ ;
+	}
+	else
+	{
+		if(fdata_close==1)
+		{
+			fclose(fdata);
+		}
+		fdata_close = 0;
 	}
 
 	// **********************************************************************************************************************
@@ -670,21 +695,22 @@ void my_plugin_run(unsigned char *frame)
 	memcpy(prev_frame,frame,imgHeight*imgWidth*2);
 	memcpy(prev_gray_frame,gray_frame,imgHeight*imgWidth);
 
+	float i_fr = (float) i_frame;
 	// **********************************************************************************************************************
 	// Downlink Message
 	// **********************************************************************************************************************
 //	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &flow_count);
 #ifdef VISION_OBSTACLE
-//	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &POE_x, &POE_y,
-//			&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
-//			&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
-//			&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
-//			&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
-	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &flatness_appearance, &appearance_uncertainty,
+	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &i_fr, &POE_y,
 			&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
 			&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
 			&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
 			&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
+//	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &flatness_appearance, &appearance_uncertainty,
+//			&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
+//			&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
+//			&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
+//			&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
 #else
 	DOWNLINK_SEND_OF_LAND(DefaultChannel, DefaultDevice, &z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &d_heading, &d_pitch, &V_body.z, &cam_h, &imu.accel.x, &imu.accel.y, &imu.accel.z);
 #endif
