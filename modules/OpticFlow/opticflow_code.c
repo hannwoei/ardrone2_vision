@@ -71,7 +71,7 @@ float OFx, OFy, dx_sum, dy_sum;
 // Corner Detection
 int *x, *y, *x_copy, *y_copy;
 int count = 0;
-int max_count = 25;
+int max_count = 50;
 #define MAX_COUNT 100
 
 // Corner Tracking
@@ -80,7 +80,7 @@ int error_opticflow;
 int flow_count = 0;
 int remove_point;
 int c;
-int borderx = 24, bordery = 24;
+int borderx = 10, bordery = 10; // 24
 
 // Remove bad corners
 float distance2, min_distance, min_distance2;
@@ -105,14 +105,21 @@ unsigned int mov_block_3D, div_point_3D;
 int *n_inlier_minu, *n_inlier_minv, DIV_FILTER;
 
 // Appearance Landing
+//#define OPTICAL_FLOW
 #define APPEARANCE_LANDING
 #ifdef APPEARANCE_LANDING
-float **** dictionary, alpha, *word_distribution, flatness_appearance, flatness_appearance2, appearance_uncertainty;
-int n_words, patch_size, n_samples, learned_samples, n_samples_image, filled, WORDS, save_dictionary, RANDOM_SAMPLES, border_width, border_height;
-float WR0, WR1, WR2, WR3, WR4, WR5, WR6, WR7, WR8, WR9, WR10, WR11, WR12, WR13, WR14, WR15, WR16, WR17, WR18, WR19, WR20, WR21, WR22, WR23, WR24, WR25,
-WR26, WR27, WR28, WR29, WR30;
-//float WR0_2, WR1_2, WR2_2, WR3_2, WR4_2, WR5_2, WR6_2, WR7_2, WR8_2, WR9_2, WR10_2, WR11_2, WR12_2, WR13_2, WR14_2, WR15_2, WR16_2, WR17_2, WR18_2, WR19_2, WR20_2,
-//WR21_2, WR22_2, WR23_2, WR24_2, WR25_2, WR26_2, WR27_2, WR28_2, WR29_2, WR30_2;
+float **** dictionary, alpha, *word_distribution, flatness_appearance, appearance_uncertainty, *linear_map;
+int n_words, patch_size, n_samples, learned_samples, n_samples_image, filled, WORDS, save_dictionary, RANDOM_SAMPLES, border_width, border_height, mapping;
+
+#define SUB_IMG
+#ifdef SUB_IMG
+// extract subimage
+int n_reg, n_reg_ax, subframe_h, subframe_w, type, in_sub_min;
+unsigned char *sub_frame;
+float sub_flatness[9], sub_min, mv_x, mv_y;
+struct EnuCoor_i waypoints_sub_min;
+#endif
+
 #endif
 
 // snapshot
@@ -182,8 +189,8 @@ void my_plugin_init(void)
 
 	// Appearance Landing
 #ifdef APPEARANCE_LANDING
-	n_words = 30, patch_size = 6, n_samples = 400000, learned_samples = 0, filled = 0, save_dictionary = 1, RANDOM_SAMPLES = 1, border_width = 80, border_height = 60;
-	alpha = 0.5, word_distribution = (float*)calloc(n_words,sizeof(float)), flatness_appearance = 0.0, flatness_appearance2 = 0.0;
+	n_words = 30, patch_size = 6, n_samples = 400000, learned_samples = 0, filled = 0, save_dictionary = 1, RANDOM_SAMPLES = 1, border_width = 80, border_height = 60, mapping = 0;
+	alpha = 0.5, word_distribution = (float*)calloc(n_words,sizeof(float)), flatness_appearance = 0.0;
 	n_samples_image = 50; // 100: train dictionary
 	WORDS = 0; // 0: train a dictionary
 	appearance_uncertainty = 0.0;
@@ -206,13 +213,27 @@ void my_plugin_init(void)
 		}
 	}
 
-	WR0 = 0.0, WR1 = 0.0, WR2 = 0.0, WR3 = 0.0, WR4 = 0.0, WR5 = 0.0, WR6 = 0.0, WR7 = 0.0, WR8 = 0.0, WR9 = 0.0, WR10 = 0.0,
-	WR11 = 0.0, WR12 = 0.0, WR13 = 0.0, WR14 = 0.0, WR15 = 0.0, WR16 = 0.0, WR17 = 0.0, WR18 = 0.0, WR19 = 0.0, WR20 = 0.0,
-	WR21 = 0.0, WR22 = 0.0, WR23 = 0.0, WR24 = 0.0, WR25 = 0.0, WR26 = 0.0, WR27 = 0.0, WR28 = 0.0, WR29 = 0.0, WR30 = 0.0;
+	// create a linear mapping
+	linear_map = (float *)calloc(n_words+1,sizeof(float));
 
-//	WR0_2 = 0.0, WR1_2 = 0.0, WR2_2 = 0.0, WR3_2 = 0.0, WR4_2 = 0.0, WR5_2 = 0.0, WR6_2 = 0.0, WR7_2 = 0.0, WR8_2 = 0.0, WR9_2 = 0.0, WR10_2 = 0.0,
-//	WR11_2 = 0.0, WR12_2 = 0.0, WR13_2 = 0.0, WR14_2 = 0.0, WR15_2 = 0.0, WR16_2 = 0.0, WR17_2 = 0.0, WR18_2 = 0.0, WR19_2 = 0.0, WR20_2 = 0.0,
-//	WR21_2 = 0.0, WR22_2 = 0.0, WR23_2 = 0.0, WR24_2 = 0.0, WR25_2 = 0.0, WR26_2 = 0.0, WR27_2 = 0.0, WR28_2 = 0.0, WR29_2 = 0.0, WR30_2 = 0.0;
+#ifdef SUB_IMG
+	type = 2; //1: Gray, 2: YUV, 3: RGB
+	n_reg = 9; // multiple of integer
+	n_reg_ax = (int) sqrt(n_reg);
+	subframe_h = (int) (imgHeight/n_reg_ax);
+	subframe_w = (int) (imgWidth/n_reg_ax);
+	border_width = (int) (80/n_reg_ax);
+	border_height = (int) (60/n_reg_ax);
+	sub_frame = (unsigned char *)calloc(type*subframe_h*subframe_w,sizeof(unsigned char));
+	for(int i = 0; i < n_reg; i++)
+	{
+		sub_flatness[i] = 0.0;
+	}
+	sub_min = 0.0;
+	in_sub_min = 0;
+	mv_x =0.0; mv_y = 0.0;
+#endif
+
 #endif
 
 	// snapshot
@@ -230,23 +251,15 @@ void my_plugin_run(unsigned char *frame)
 //	// set heading
 //	nav_set_heading_rad(5.73515192); // 328.6 deg = 5.73515192 rad
 
+	// ***********************************************************************************************************************
+	// Additional information from other sensors
+	// ***********************************************************************************************************************
 #ifdef VISION_OBSTACLE
 	// update obstacle waypoint
 	enu_of_ecef_pos_i(&waypoint_ob1, &state.ned_origin_i, &obstacle.ecef_pos);
 
 	nav_move_waypoint(WP_ob1, &waypoint_ob1);
 #endif
-
-	if(old_img_init == 1)
-	{
-		memcpy(prev_frame,frame,imgHeight*imgWidth*2);
-		CvtYUYV2Gray(prev_gray_frame, prev_frame, imgWidth, imgHeight);
-		old_img_init = 0;
-	}
-
-	// ***********************************************************************************************************************
-	// Additional information from other sensors
-	// ***********************************************************************************************************************
 
     // Compute body velocities from ENU
     V_Ned.x = stateGetSpeedNed_f()->x;
@@ -257,14 +270,32 @@ void my_plugin_run(unsigned char *frame)
     FLOAT_RMAT_OF_QUAT(Rmat_Ned2Body,*BodyQuaternions);
     RMAT_VECT3_MUL(V_body, Rmat_Ned2Body, V_Ned);
 
+#ifdef USE_SONAR
+	cam_h = ins_impl.sonar_z;
+#else
+	cam_h = stateGetPositionEnu_f()->z;
+#endif
+
+	curr_pitch = stateGetNedToBodyEulers_f()->theta;
+	curr_roll = stateGetNedToBodyEulers_f()->phi;
+	curr_yaw = stateGetNedToBodyEulers_f()->psi;
+
 	// ***********************************************************************************************************************
 	// Corner detection
 	// ***********************************************************************************************************************
+#ifdef OPTICAL_FLOW
+	if(old_img_init == 1)
+	{
+		memcpy(prev_frame,frame,imgHeight*imgWidth*2);
+		CvtYUYV2Gray(prev_gray_frame, prev_frame, imgWidth, imgHeight);
+		old_img_init = 0;
+	}
 
 	// FAST corner detection
 	int fast_threshold = 20;
 	xyFAST* pnts_fast;
 	pnts_fast = fast9_detect((const byte*)prev_gray_frame, imgWidth, imgHeight, imgWidth, fast_threshold, &count);
+//	pnts_fast = fast9_detect_nonmax((const byte*)prev_gray_frame, imgWidth, imgHeight, imgWidth, fast_threshold, &count);
 
 	if(count > MAX_COUNT) count = MAX_COUNT;
 	for(int i = 0; i < count; i++)
@@ -329,7 +360,7 @@ void my_plugin_run(unsigned char *frame)
 	{
 		remove_point = 1;
 
-		if(status[i] && !(new_x[i] < borderx || new_x[i] > (imgWidth-1-borderx) ||
+		if(status[i] || !(new_x[i] < borderx || new_x[i] > (imgWidth-1-borderx) ||
 				new_y[i] < bordery || new_y[i] > (imgHeight-1-bordery)))
 		{
 			remove_point = 0;
@@ -348,10 +379,7 @@ void my_plugin_run(unsigned char *frame)
 		}
 	}
 
-	// Flow Derotation
-	curr_pitch = stateGetNedToBodyEulers_f()->theta;
-	curr_roll = stateGetNedToBodyEulers_f()->phi;
-	curr_yaw = stateGetNedToBodyEulers_f()->psi;
+	// Flow Derotation;
 
 	diff_pitch = (curr_pitch - prev_pitch)*imgHeight/FOV_H;
 	diff_roll = (curr_roll - prev_roll)*imgWidth/FOV_W;
@@ -429,11 +457,7 @@ void my_plugin_run(unsigned char *frame)
 	OFfilter(&OFx, &OFy, OFx_trans, OFy_trans, flow_count, 1);
 
 	// Velocity Computation
-	#ifdef USE_SONAR
-		cam_h = ins_impl.sonar_z;
-	#else
-		cam_h = stateGetPositionEnu_f()->z;
-	#endif
+
 
 //	Velx = OFy*cam_h*FPS/Fy_ARdrone + 0.05;
 //	Vely = -OFx*cam_h*FPS/Fx_ARdrone - 0.1;
@@ -462,7 +486,7 @@ void my_plugin_run(unsigned char *frame)
 //	int USE_MEDIAN_3D = 1;
 //	threshold_3D_low = 450.0;
 //	threshold_3D_high = 1000.0;
-
+	flatness = 0.0;
 	if(USE_FITTING == 1)
 	{
 		analyseTTI(&z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &mean_tti, &median_tti, &d_heading, &d_pitch, &divergence_error, x, y, dx, dy, n_inlier_minu, n_inlier_minv, flow_count, imgWidth, imgHeight, &DIV_FILTER);
@@ -498,6 +522,7 @@ void my_plugin_run(unsigned char *frame)
 	{
 		ground_divergence = V_body.z/cam_h;
 	}
+#endif
 
 	// **********************************************************************************************************************
 	// Appearance Landing
@@ -538,13 +563,25 @@ void my_plugin_run(unsigned char *frame)
 			printf("load dictionary done!\n");
 		}
 
-		WR0 = 48099, WR1 = -46842, WR2 = -46928, WR3 = -47082, WR4 = -46889, WR5 = -47530, WR6 = -46625, WR7 = -47127, WR8 = -47083, WR9 = -47162, WR10 = -47225,
-		WR11 = -47363, WR12 = -46966, WR13 = -47174, WR14 = -47015, WR15 = -46143, WR16 = -47118, WR17 = -47126, WR18 = -47235, WR19 = -47345, WR20 = -47044,
-		WR21 = -46892, WR22 = -47285, WR23 = -46936, WR24 = -47102, WR25 = -6692,	WR26 = -46994, WR27 = -46805, WR28 = -47011, WR29 = -47124, WR30 = -47048;
+		//load a linear mapping
+		FILE *fdm;
+		mapping = 0;
+		fdm=fopen("/data/video/LinearMap.txt", "r");
 
-//		WR0_2 = 51071, WR1_2 = -49796, WR2_2 = -49812, WR3_2 = -49935, WR4_2 = -49792, WR5_2 = -50474, WR6_2 = -49638, WR7_2 = -50056, WR8_2 = -49998, WR9_2 = -50072, WR10_2 = -50155,
-//		WR11_2 = -50274, WR12_2 = -49892, WR13_2 = -50049, WR14_2 = -49936, WR15_2 = -49184, WR16_2 = -50030, WR17_2 = -50038, WR18_2 = -50098, WR19_2 = -50251, WR20_2 = -49926,
-//		WR21_2 = -49734, WR22_2 = -50232, WR23_2 = -49847, WR24_2 = -50003, WR25_2 = -49509, WR26_2 = -49912, WR27_2 = -49705, WR28_2 = -49935, WR29_2 = -50038, WR30_2 = -49978;
+		if(fdm == NULL)
+		{
+			perror("Error while opening the file.\n");
+		}
+		else
+		{
+			for(int i = 0; i < n_words+1; i++)
+			{
+				if(fscanf(fdm, "%f\n", &linear_map[i]) == EOF) break;
+			}
+			fclose(fdm);
+			mapping = 1;
+			printf("load mapping done!\n");
+		}
 	}
 
 	if(learned_samples >= n_samples && !WORDS)
@@ -592,42 +629,113 @@ void my_plugin_run(unsigned char *frame)
 	// flatness model
 	if(extract_distribution)
 	{
+#ifdef SUB_IMG
+		//n_samples_image need to be tuned
+		n_samples_image = 50;
+		in_sub_min = 0;
+
+		for(int i = 0; i < n_reg_ax; i++)
+		{
+			for(int j = 0; j < n_reg_ax; j++)
+			{
+				subimage_extraction(frame, sub_frame, imgWidth, imgHeight, type, n_reg, i, j);
+				DistributionExtraction(dictionary, sub_frame, word_distribution, n_words, patch_size, n_samples_image, RANDOM_SAMPLES, subframe_w, subframe_h, border_width, border_height, &appearance_uncertainty);
+
+				if(mapping == 1)
+				{
+					flatness_appearance = linear_map[0]
+							+ word_distribution[0]*linear_map[1] + word_distribution[1]*linear_map[2] + word_distribution[2]*linear_map[3] + word_distribution[3]*linear_map[4] + word_distribution[4]*linear_map[5]
+							+ word_distribution[5]*linear_map[6] + word_distribution[6]*linear_map[7] + word_distribution[7]*linear_map[8] + word_distribution[8]*linear_map[9] + word_distribution[9]*linear_map[10]
+							+ word_distribution[10]*linear_map[11] + word_distribution[11]*linear_map[12] + word_distribution[12]*linear_map[13] + word_distribution[13]*linear_map[14] + word_distribution[14]*linear_map[15]
+							+ word_distribution[15]*linear_map[16] + word_distribution[16]*linear_map[17] + word_distribution[17]*linear_map[18] + word_distribution[18]*linear_map[19] + word_distribution[19]*linear_map[20]
+							+ word_distribution[20]*linear_map[21] + word_distribution[21]*linear_map[22] + word_distribution[22]*linear_map[23] + word_distribution[23]*linear_map[24] + word_distribution[24]*linear_map[25]
+							+ word_distribution[25]*linear_map[26] + word_distribution[26]*linear_map[27] + word_distribution[27]*linear_map[28] + word_distribution[28]*linear_map[29] + word_distribution[29]*linear_map[30];
+				}
+				sub_flatness[i*n_reg_ax+j] = flatness_appearance;
+				if(i==0 && j==0)
+				{
+					sub_min = flatness_appearance;
+					in_sub_min = 0;
+				}
+
+				if(flatness_appearance<sub_min)
+				{
+					sub_min = flatness_appearance;
+					in_sub_min = i*n_reg_ax+j;
+				}
+			}
+		}
+
+		if(snapshot) // move to min flatness
+		{
+			if(in_sub_min == 0)
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+			else if(in_sub_min == 1)
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+			else if(in_sub_min == 2)
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+			else if(in_sub_min == 3)
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+			else if(in_sub_min == 5)
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+			else if(in_sub_min == 6)
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+			else if(in_sub_min == 7)
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+			else if(in_sub_min == 8)
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+			else
+			{
+				mv_x = 0.0;
+				mv_y = 0.0;
+			}
+
+			waypoints_sub_min.x = stateGetPositionEnu_i()->x + mv_x;
+			waypoints_sub_min.y = stateGetPositionEnu_i()->y + mv_y;
+			waypoints_sub_min.z = stateGetPositionEnu_i()->z;
+//			nav_move_waypoint(WP_P3, &waypoints_sub_min);
+			snapshot = FALSE;
+		}
+#else
 		n_samples_image = 50;
 		DistributionExtraction(dictionary, frame, word_distribution, n_words, patch_size, n_samples_image, RANDOM_SAMPLES, imgWidth, imgHeight, border_width, border_height, &appearance_uncertainty);
 
-//		flatness_appearance = WR0
-//				+ word_distribution[0]*WR1 + word_distribution[1]*WR2 + word_distribution[2]*WR3 + word_distribution[3]*WR4 + word_distribution[4]*WR5
-//				+ word_distribution[5]*WR6 + word_distribution[6]*WR7 + word_distribution[7]*WR8 + word_distribution[8]*WR9 + word_distribution[9]*WR10
-//				+ word_distribution[10]*WR11 + word_distribution[11]*WR12 + word_distribution[12]*WR13 + word_distribution[13]*WR14 + word_distribution[14]*WR15
-//				+ word_distribution[15]*WR16 + word_distribution[16]*WR17 + word_distribution[17]*WR18 + word_distribution[18]*WR19 + word_distribution[19]*WR20
-//				+ word_distribution[20]*WR21 + word_distribution[21]*WR22 + word_distribution[22]*WR23 + word_distribution[23]*WR24 + word_distribution[24]*WR25
-//				+ word_distribution[25]*WR26 + word_distribution[26]*WR27 + word_distribution[27]*WR28 + word_distribution[28]*WR29 + word_distribution[29]*WR30;
+		if(mapping == 1)
+		{
+			flatness_appearance = linear_map[0]
+					+ word_distribution[0]*linear_map[1] + word_distribution[1]*linear_map[2] + word_distribution[2]*linear_map[3] + word_distribution[3]*linear_map[4] + word_distribution[4]*linear_map[5]
+					+ word_distribution[5]*linear_map[6] + word_distribution[6]*linear_map[7] + word_distribution[7]*linear_map[8] + word_distribution[8]*linear_map[9] + word_distribution[9]*linear_map[10]
+					+ word_distribution[10]*linear_map[11] + word_distribution[11]*linear_map[12] + word_distribution[12]*linear_map[13] + word_distribution[13]*linear_map[14] + word_distribution[14]*linear_map[15]
+					+ word_distribution[15]*linear_map[16] + word_distribution[16]*linear_map[17] + word_distribution[17]*linear_map[18] + word_distribution[18]*linear_map[19] + word_distribution[19]*linear_map[20]
+					+ word_distribution[20]*linear_map[21] + word_distribution[21]*linear_map[22] + word_distribution[22]*linear_map[23] + word_distribution[23]*linear_map[24] + word_distribution[24]*linear_map[25]
+					+ word_distribution[25]*linear_map[26] + word_distribution[26]*linear_map[27] + word_distribution[27]*linear_map[28] + word_distribution[28]*linear_map[29] + word_distribution[29]*linear_map[30];
+		}
+#endif
 
-//		flatness_appearance2 = WR0_2
-//				+ word_distribution[0]*WR1_2 + word_distribution[1]*WR2_2 + word_distribution[2]*WR3_2 + word_distribution[3]*WR4_2 + word_distribution[4]*WR5_2
-//				+ word_distribution[5]*WR6_2 + word_distribution[6]*WR7_2 + word_distribution[7]*WR8_2 + word_distribution[8]*WR9_2 + word_distribution[9]*WR10_2
-//				+ word_distribution[10]*WR11_2 + word_distribution[11]*WR12_2 + word_distribution[12]*WR13_2 + word_distribution[13]*WR14_2 + word_distribution[14]*WR15_2
-//				+ word_distribution[15]*WR16_2 + word_distribution[16]*WR17_2 + word_distribution[17]*WR18_2 + word_distribution[18]*WR19_2 + word_distribution[19]*WR20_2
-//				+ word_distribution[20]*WR21_2 + word_distribution[21]*WR22_2 + word_distribution[22]*WR23_2 + word_distribution[23]*WR24_2 + word_distribution[24]*WR25_2
-//				+ word_distribution[25]*WR26_2 + word_distribution[26]*WR27_2 + word_distribution[27]*WR28_2 + word_distribution[28]*WR29_2 + word_distribution[29]*WR30_2;
-
-//		flatness_appearance = 42869
-//				+ word_distribution[0]*(-41943) + word_distribution[1]*(-41908) + word_distribution[2]*(-41932) + word_distribution[3]*(-41837) + word_distribution[4]*(-41990)
-//				+ word_distribution[5]*(-42006) + word_distribution[6]*(-41931) + word_distribution[7]*(-42106) + word_distribution[8]*(-41802) + word_distribution[9]*(-41945)
-//				+ word_distribution[10]*(-41966) + word_distribution[11]*(-42035) + word_distribution[12]*(-41730) + word_distribution[13]*(-41973) + word_distribution[14]*(-41866)
-//				+ word_distribution[15]*(-41744) + word_distribution[16]*(-41843) + word_distribution[17]*(-41949) + word_distribution[18]*(-42041) + word_distribution[19]*(-41818)
-//				+ word_distribution[20]*(-41786) + word_distribution[21]*(-42194) + word_distribution[22]*(-42003) + word_distribution[23]*(-42161) + word_distribution[24]*(-41849)
-//				+ word_distribution[25]*(-42364) + word_distribution[26]*(-41797) + word_distribution[27]*(-42065) + word_distribution[28]*(-41914) + word_distribution[29]*(-41848);
-
-
-//		flatness_appearance = 2294.5
-//				+ word_distribution[0]*(-2145.1) + word_distribution[1]*(583.7) + word_distribution[2]*(-2166.2) + word_distribution[3]*(1624.4) + word_distribution[4]*(1012)
-//				+ word_distribution[5]*(-2860.2) + word_distribution[6]*(-790.6) + word_distribution[7]*(5165.1) + word_distribution[8]*(226.8) + word_distribution[9]*(-3481.1)
-//				+ word_distribution[10]*(-1765.4) + word_distribution[11]*(-3412) + word_distribution[12]*(-1787.9) + word_distribution[13]*(-2698.2) + word_distribution[14]*(67.6)
-//				+ word_distribution[15]*(-6578.4) + word_distribution[16]*(-2859.1) + word_distribution[17]*(-8525.5) + word_distribution[18]*(4740.1) + word_distribution[19]*(37066.1)
-//				+ word_distribution[20]*(-2455.2) + word_distribution[21]*(-459) + word_distribution[22]*(8448.4) + word_distribution[23]*(-2449) + word_distribution[24]*(-1939.3)
-//				+ word_distribution[25]*(-482.3) + word_distribution[26]*(-6793.7) + word_distribution[27]*(552.6) + word_distribution[28]*(-2314.5) + word_distribution[29]*(-1205.5);
-//
 //		if(flatness_appearance < 400.0)
 //		{
 //			land_distribution = 1;
@@ -637,13 +745,13 @@ void my_plugin_run(unsigned char *frame)
 //			land_distribution = 0;
 //		}
 
-		DOWNLINK_SEND_Distribution(DefaultChannel, DefaultDevice, &flatness
-								, &word_distribution[0], &word_distribution[1], &word_distribution[2], &word_distribution[3], &word_distribution[4]
-		                        , &word_distribution[5], &word_distribution[6], &word_distribution[7], &word_distribution[8], &word_distribution[9]
-		                        , &word_distribution[10], &word_distribution[11], &word_distribution[12], &word_distribution[13], &word_distribution[14]
-		                        , &word_distribution[15], &word_distribution[16], &word_distribution[17], &word_distribution[18], &word_distribution[19]
-		                        , &word_distribution[20], &word_distribution[21], &word_distribution[22], &word_distribution[23], &word_distribution[24]
-		                        , &word_distribution[25], &word_distribution[26], &word_distribution[27], &word_distribution[28], &word_distribution[29]);
+//		DOWNLINK_SEND_Distribution(DefaultChannel, DefaultDevice, &flatness
+//								, &word_distribution[0], &word_distribution[1], &word_distribution[2], &word_distribution[3], &word_distribution[4]
+//		                        , &word_distribution[5], &word_distribution[6], &word_distribution[7], &word_distribution[8], &word_distribution[9]
+//		                        , &word_distribution[10], &word_distribution[11], &word_distribution[12], &word_distribution[13], &word_distribution[14]
+//		                        , &word_distribution[15], &word_distribution[16], &word_distribution[17], &word_distribution[18], &word_distribution[19]
+//		                        , &word_distribution[20], &word_distribution[21], &word_distribution[22], &word_distribution[23], &word_distribution[24]
+//		                        , &word_distribution[25], &word_distribution[26], &word_distribution[27], &word_distribution[28], &word_distribution[29]);
 
 	}
 
@@ -652,48 +760,49 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 	// Save an image
 	// **********************************************************************************************************************
-	if(snapshot)
-	{
-//		if(land_distribution)
+//	if(snapshot)
+//	{
+////		if(land_distribution)
+////		{
+////			sprintf(filename, "/data/video/safe_%d.dat", i_frame);
+////			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+////		}
+////		else
+////		{
+////			sprintf(filename, "/data/video/unsafe_%d.dat", i_frame);
+////			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+////		}
+////		snapshot = FALSE;
+//		sprintf(filename, "/data/video/usb0/image_%d.dat", i_frame);
+//		saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+//
+//		if(fdata == NULL)
 //		{
-//			sprintf(filename, "/data/video/safe_%d.dat", i_frame);
-//			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+//			perror("Error while opening the file.\n");
 //		}
 //		else
 //		{
-//			sprintf(filename, "/data/video/unsafe_%d.dat", i_frame);
-//			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+//			fprintf(fdata, "%d %f %f %d %f %f %f %f\n",i_frame, FPS, flatness, flow_count, cam_h, curr_pitch, curr_roll, curr_yaw);
+//			fdata_close = 1;
 //		}
-//		snapshot = FALSE;
-		sprintf(filename, "/data/video/usb0/image_%d.dat", i_frame);
-		saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
-
-		if(fdata == NULL)
-		{
-			perror("Error while opening the file.\n");
-		}
-		else
-		{
-			fprintf(fdata, "%d %f %f %d %f %f %f %f\n",i_frame, FPS, flatness, flow_count, cam_h, curr_pitch, curr_roll, curr_yaw);
-			fdata_close = 1;
-		}
-		i_frame ++ ;
-	}
-	else
-	{
-		if(fdata_close==1)
-		{
-			fclose(fdata);
-		}
-		fdata_close = 0;
-	}
+//		i_frame ++ ;
+//	}
+//	else
+//	{
+//		if(fdata_close==1)
+//		{
+//			fclose(fdata);
+//		}
+//		fdata_close = 0;
+//	}
 
 	// **********************************************************************************************************************
 	// Next Loop Preparation
 	// **********************************************************************************************************************
-
+#ifdef OPTICAL_FLOW
 	memcpy(prev_frame,frame,imgHeight*imgWidth*2);
 	memcpy(prev_gray_frame,gray_frame,imgHeight*imgWidth);
+#endif
 
 	float i_fr = (float) i_frame;
 	// **********************************************************************************************************************
@@ -701,19 +810,30 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 //	DOWNLINK_SEND_OF_HOVER(DefaultChannel, DefaultDevice, &FPS, &dx_sum, &dy_sum, &OFx, &OFy, &diff_roll, &diff_pitch, &Velx, &Vely, &V_body.x, &V_body.y, &cam_h, &flow_count);
 #ifdef VISION_OBSTACLE
-	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &i_fr, &POE_y,
-			&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
-			&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
-			&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
-			&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
-//	DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &flatness_appearance, &appearance_uncertainty,
-//			&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
-//			&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
-//			&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
-//			&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
+	#ifdef OPTICAL_FLOW
+		DOWNLINK_SEND_OF_LAND_OBSTACLE(DefaultChannel, DefaultDevice, &FPS, &z_x, &z_y, &flatness, &i_fr, &POE_y,
+				&divergence, &ground_divergence, &d_heading, &d_pitch, &flow_count,
+				&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
+				&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
+				&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
+	#endif
+	#ifdef APPEARANCE_LANDING
+		#ifdef SUB_IMG
+			DOWNLINK_SEND_OF_LAND_SUB_IMG(DefaultChannel, DefaultDevice, &FPS, &sub_flatness[0], &sub_flatness[1], &sub_flatness[2],
+			        &sub_flatness[3], &sub_flatness[4], &sub_flatness[5],
+			        &sub_flatness[6], &sub_flatness[7], &sub_flatness[8],
+					&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
+					&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
+					&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
+		#else
+			DOWNLINK_SEND_OF_LAND_APPEARANCE(DefaultChannel, DefaultDevice, &FPS, &flatness_appearance,
+					&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
+					&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
+					&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);
+		#endif
+	#endif
 #else
 	DOWNLINK_SEND_OF_LAND(DefaultChannel, DefaultDevice, &z_x, &z_y, &flatness, &POE_x, &POE_y, &divergence, &d_heading, &d_pitch, &V_body.z, &cam_h, &imu.accel.x, &imu.accel.y, &imu.accel.z);
 #endif
-	// rotation angle, height, obstacle position (measured size),
 }
 

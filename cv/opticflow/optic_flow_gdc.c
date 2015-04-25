@@ -1122,7 +1122,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			// select a random sample of n_sample points:
 			memset(sample_indices, 0, n_samples*sizeof(int));
 			i_rand = 0;
-//printf("stop1\n");
+
 			while(i_rand < n_samples)
 			{
 				si = rand() % count;
@@ -1137,7 +1137,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 					i_rand ++;
 				}
 			}
-//printf("stop2\n");
+
 			// Setup the system:
 			for(sam = 0; sam < n_samples; sam++)
 			{
@@ -1148,7 +1148,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 				bv[sam] = (float) dy[sample_indices[sam]];
 				//printf("%d,%d,%d,%d,%d\n",A[sam][0],A[sam][1],A[sam][2],bu[sam],bv[sam]);
 			}
-//printf("stop3\n");
+
 			// Solve the small system:
 /*            int i;
 			for(i=0;i<3;i++)
@@ -1176,7 +1176,6 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			}
 			printf("\n");*/
 
-//printf("stop4\n");
 			// count inliers and determine their error:
 			errors_pu[it] = 0;
 			errors_pv[it] = 0;
@@ -1216,18 +1215,23 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 			}
 //			printf("\n");
 		}
-//printf("stop5\n");
 
-		// select the parameters with lowest error:
+		// select the parameters with lowest error/ max inlier:
 		// for horizontal flow:
 		int param;
 		int min_ind = 0;
-		*min_error_u = (float)errors_pu[0];
+//		*min_error_u = (float)errors_pu[0];
+		*n_inlier_minu = n_inliers_pu[0];
 		for(it = 1; it < n_iterations; it++)
 		{
-			if(errors_pu[it] < *min_error_u)
+//			if(errors_pu[it] < *min_error_u)
+//			{
+//				*min_error_u = (float)errors_pu[it];
+//				min_ind = it;
+//			}
+			if(n_inliers_pu[it] > *n_inlier_minu)
 			{
-				*min_error_u = (float)errors_pu[it];
+				*n_inlier_minu = n_inliers_pu[it];
 				min_ind = it;
 			}
 		}
@@ -1235,16 +1239,22 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		{
 			pu[param] = PU[min_ind*3+param];
 		}
-		//printf("pu_sel=%f,%f,%f\n",pu[0],pu[1],pu[2]);
+//		*n_inlier_minu = n_inliers_pu[min_ind];
+
 		// for vertical flow:
 		min_ind = 0;
-		*min_error_v = (float)errors_pv[0];
-
+//		*min_error_v = (float)errors_pv[0];
+		*n_inlier_minv = n_inliers_pv[0];
 		for(it = 0; it < n_iterations; it++)
 		{
-			if(errors_pv[it] < *min_error_v)
+//			if(errors_pv[it] < *min_error_v)
+//			{
+//				*min_error_v = (float)errors_pv[it];
+//				min_ind = it;
+//			}
+			if(n_inliers_pv[it] > *n_inlier_minv)
 			{
-				*min_error_v = (float)errors_pv[it];
+				*n_inlier_minv = n_inliers_pv[it];
 				min_ind = it;
 			}
 		}
@@ -1252,9 +1262,9 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		{
 			pv[param] = PV[min_ind*3+param];
 		}
-		*n_inlier_minu = n_inliers_pu[min_ind];
-		*n_inlier_minv = n_inliers_pv[min_ind];
-//printf("stop6\n");
+
+//		*n_inlier_minv = n_inliers_pv[min_ind];
+
 		// error has to be determined on the entire set:
 		MatVVMul(bb, AA, pu, 3, count);
 		float scaleM;
@@ -1277,7 +1287,7 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		*divergence_error = (*min_error_u + *min_error_v) / (2 * count);
 
 		// delete allocated dynamic arrays
-//printf("stop7\n");
+
 		for(sam = 0; sam < n_samples; sam++) free(A[sam]);
 		for(sam = 0; sam < count; sam++) free(AA[sam]);
 		free(A);
@@ -1295,7 +1305,6 @@ void fitLinearFlowField(float* pu, float* pv, float* divergence_error, int *x, i
 		free(bb);
 		free(C);
 		free(sample_indices);
-//printf("stop8\n");
 }
 
 unsigned int mov_block = 15; //default: 30
@@ -1458,7 +1467,7 @@ void slopeEstimation(float *z_x, float *z_y, float *three_dimensionality, float 
 void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_x, float *POE_y, float *divergence, float *mean_tti, float *median_tti, float *d_heading, float *d_pitch, float *divergence_error, int *x, int *y, int *dx, int *dy, int *n_inlier_minu, int *n_inlier_minv, int count, int imW, int imH, int *DIV_FILTER)
 {
 		// linear fit of the optic flow field
-		float error_threshold = 10; // 10
+		float error_threshold = 0.5; // 10
 		int n_iterations = 20; // 20
 
 		int n_samples = (count < 5) ? count : 5;
@@ -1479,11 +1488,11 @@ void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_
 
 		fitLinearFlowField(pu, pv, divergence_error, x, y, dx, dy, count, n_samples, &min_error_u, &min_error_v, n_iterations, error_threshold, n_inlier_minu, n_inlier_minv);
 
-		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, DIV_FILTER);
+//		extractInformationFromLinearFlowField(divergence, mean_tti, median_tti, d_heading, d_pitch, pu, pv, imW, imH, DIV_FILTER);
 
-		slopeEstimation(z_x, z_y, three_dimensionality, POE_x, POE_y, *d_heading, *d_pitch, pu, pv, min_error_u, min_error_v);
+//		slopeEstimation(z_x, z_y, three_dimensionality, POE_x, POE_y, *d_heading, *d_pitch, pu, pv, min_error_u, min_error_v);
 
-		*three_dimensionality = *three_dimensionality/(count*2);
+		*three_dimensionality = *divergence_error;
 
 }
 
@@ -1902,3 +1911,28 @@ void DistributionExtraction(float ****color_words, unsigned char *frame, float* 
 	free(buf);
 
 } // EXECUTION
+
+void subimage_extraction(unsigned char *frame, unsigned char *sub_frame, int imgW, int imgH, int type, int n_reg, int in_reg_h, int in_reg_w)
+{
+	int n_reg_ax, subframe_h, subframe_w, start_reg_h, start_reg_w, end_reg_h, end_reg_w, m, n, i, j;
+	n_reg_ax = (int) sqrt(n_reg);
+	subframe_h = (int) (imgH/n_reg_ax);
+	subframe_w = (int) (imgW/n_reg_ax);
+	start_reg_h = in_reg_h*subframe_h;
+	start_reg_w = in_reg_w*type*subframe_w;
+	end_reg_h = (in_reg_h+1)*subframe_h-1;
+	end_reg_w = (in_reg_w+1)*type*subframe_w-1;
+	m = 0;
+	n = 0;
+//	printf("sub_img_size:(%d,%d)\n",subframe_w,subframe_h);
+	for(i=start_reg_h; i<end_reg_h+1; i++)
+	{
+		for(j=start_reg_w; j<end_reg_w+1; j++)
+		{
+			sub_frame[m*type*subframe_w+n] = frame[type*i*imgW+j];
+			n++;
+		}
+		m++;
+		n = 0;
+	}
+}

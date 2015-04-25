@@ -52,4 +52,5 @@ void analyseTTI(float *z_x, float *z_y, float *three_dimensionality, float *POE_
 void saveSingleImageDataFile(unsigned char *frame_buf, int width, int height, char filename[100]);
 void DictionaryTrainingYUV(float ****color_words, unsigned char *frame, int n_words, int patch_size, int *learned_samples, int n_samples_image, float alpha, int Width, int Height, int *filled);
 void DistributionExtraction(float ****color_words, unsigned char *frame, float* word_distribution, int n_words, int patch_size, int n_samples_image, int RANDOM_SAMPLES, int Width, int Height, int border_width, int border_height, float *error_appearance);
+void subimage_extraction(unsigned char *frame, unsigned char *sub_frame, int imgW, int imgH, int type, int n_reg, int in_reg_h, int in_reg_w);
 #endif
