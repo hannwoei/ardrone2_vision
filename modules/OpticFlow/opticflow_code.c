@@ -118,6 +118,7 @@ int n_reg, n_reg_ax, subframe_h, subframe_w, type, in_sub_min;
 unsigned char *sub_frame;
 float sub_flatness[9], sub_min, mv_x, mv_y;
 struct EnuCoor_i waypoints_sub_min;
+bool_t activate_appearance;
 #endif
 
 #endif
@@ -138,6 +139,10 @@ unsigned int land_distribution;
 
 #ifndef VISION_SNAPSHOT
 #define VISION_SNAPSHOT FALSE
+#endif
+
+#ifndef VISION_APPEARANCE
+#define VISION_APPEARANCE FALSE
 #endif
 
 FILE *fdata;
@@ -232,6 +237,8 @@ void my_plugin_init(void)
 	sub_min = 0.0;
 	in_sub_min = 0;
 	mv_x =0.0; mv_y = 0.0;
+
+	activate_appearance = VISION_APPEARANCE;
 #endif
 
 #endif
@@ -667,47 +674,51 @@ void my_plugin_run(unsigned char *frame)
 			}
 		}
 
-		if(snapshot) // move to min flatness
+		if(activate_appearance) // move to min flatness
 		{
+			float dw, dh;
+			dw = 106*cam_h/Fx_ARdrone;
+			dh = 80*cam_h/Fy_ARdrone;
+
 			if(in_sub_min == 0)
 			{
-				mv_x = 0.0;
-				mv_y = 0.0;
+				mv_x = dh;
+				mv_y = dw;
 			}
 			else if(in_sub_min == 1)
 			{
-				mv_x = 0.0;
+				mv_x = dh;
 				mv_y = 0.0;
 			}
 			else if(in_sub_min == 2)
 			{
-				mv_x = 0.0;
-				mv_y = 0.0;
+				mv_x = dh;
+				mv_y = -dw;
 			}
 			else if(in_sub_min == 3)
 			{
 				mv_x = 0.0;
-				mv_y = 0.0;
+				mv_y = dw;
 			}
 			else if(in_sub_min == 5)
 			{
 				mv_x = 0.0;
-				mv_y = 0.0;
+				mv_y = -dw;
 			}
 			else if(in_sub_min == 6)
 			{
-				mv_x = 0.0;
-				mv_y = 0.0;
+				mv_x = -dh;
+				mv_y = dw;
 			}
 			else if(in_sub_min == 7)
 			{
-				mv_x = 0.0;
+				mv_x = -dh;
 				mv_y = 0.0;
 			}
 			else if(in_sub_min == 8)
 			{
-				mv_x = 0.0;
-				mv_y = 0.0;
+				mv_x = -dh;
+				mv_y = -dw;
 			}
 			else
 			{
@@ -715,13 +726,19 @@ void my_plugin_run(unsigned char *frame)
 				mv_y = 0.0;
 			}
 
-			float angle = -0.54803;
+			float angle, mv_x_enuf, mv_y_enuf;
+			angle = curr_yaw-1.57079633;
 
-			waypoints_sub_min.x = stateGetPositionEnu_i()->x + mv_y*cos(angle) + mv_y*sin(angle);
-			waypoints_sub_min.y = stateGetPositionEnu_i()->y - mv_y*sin(angle) + mv_y*cos(angle);
+			mv_x_enuf = mv_x*cos(angle) + mv_y*sin(angle);
+			mv_y_enuf = - mv_x*sin(angle) + mv_y*cos(angle);
+
+			waypoints_sub_min.x = stateGetPositionEnu_i()->x + POS_BFP_OF_REAL(mv_x_enuf);
+			waypoints_sub_min.y = stateGetPositionEnu_i()->y + POS_BFP_OF_REAL(mv_y_enuf);
 			waypoints_sub_min.z = stateGetPositionEnu_i()->z;
-			nav_move_waypoint(WP_P3, &waypoints_sub_min);
-			snapshot = FALSE;
+			nav_move_waypoint(WP_p3, &waypoints_sub_min);
+
+			activate_appearance = FALSE;
+			extract_distribution = FALSE;
 		}
 #else
 		n_samples_image = 50;
@@ -763,22 +780,23 @@ void my_plugin_run(unsigned char *frame)
 	// **********************************************************************************************************************
 	// Save an image
 	// **********************************************************************************************************************
-//	if(snapshot)
-//	{
-////		if(land_distribution)
-////		{
-////			sprintf(filename, "/data/video/safe_%d.dat", i_frame);
-////			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
-////		}
-////		else
-////		{
-////			sprintf(filename, "/data/video/unsafe_%d.dat", i_frame);
-////			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
-////		}
-////		snapshot = FALSE;
+	if(snapshot)
+	{
+//		if(land_distribution)
+//		{
+//			sprintf(filename, "/data/video/safe_%d.dat", i_frame);
+//			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+//		}
+//		else
+//		{
+//			sprintf(filename, "/data/video/unsafe_%d.dat", i_frame);
+//			saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+//		}
+		snapshot = FALSE;
 //		sprintf(filename, "/data/video/usb0/image_%d.dat", i_frame);
-//		saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
-//
+		sprintf(filename, "/data/video/image_%d.dat", i_frame);
+		saveSingleImageDataFile(frame, imgWidth, imgHeight, filename);
+
 //		if(fdata == NULL)
 //		{
 //			perror("Error while opening the file.\n");
@@ -789,15 +807,15 @@ void my_plugin_run(unsigned char *frame)
 //			fdata_close = 1;
 //		}
 //		i_frame ++ ;
-//	}
-//	else
-//	{
+	}
+	else
+	{
 //		if(fdata_close==1)
 //		{
 //			fclose(fdata);
 //		}
 //		fdata_close = 0;
-//	}
+	}
 
 	// **********************************************************************************************************************
 	// Next Loop Preparation
@@ -824,7 +842,7 @@ void my_plugin_run(unsigned char *frame)
 		#ifdef SUB_IMG
 			DOWNLINK_SEND_OF_LAND_SUB_IMG(DefaultChannel, DefaultDevice, &FPS, &sub_flatness[0], &sub_flatness[1], &sub_flatness[2],
 			        &sub_flatness[3], &sub_flatness[4], &sub_flatness[5],
-			        &sub_flatness[6], &sub_flatness[7], &sub_flatness[8],
+			        &sub_flatness[6], &sub_flatness[7], &sub_flatness[8], &sub_min, &in_sub_min,
 					&V_body.x, &V_body.y, &V_body.z, &cam_h, &curr_pitch, &curr_roll, &curr_yaw,
 					&stateGetPositionEnu_i()->x, &stateGetPositionEnu_i()->y, &stateGetPositionEnu_i()->z,
 					&waypoint_ob1.x, &waypoint_ob1.y, &waypoint_ob1.z);

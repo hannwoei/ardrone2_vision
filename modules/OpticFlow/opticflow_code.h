@@ -46,6 +46,7 @@ extern float ground_divergence;
 // Appearance Landing
 extern bool_t train_dictionary;
 extern bool_t extract_distribution;
+extern bool_t activate_appearance;
 
 // Snapshot
 extern bool_t snapshot;
