@@ -652,6 +652,7 @@ void my_plugin_run(unsigned char *frame)
 							+ word_distribution[25]*linear_map[26] + word_distribution[26]*linear_map[27] + word_distribution[27]*linear_map[28] + word_distribution[28]*linear_map[29] + word_distribution[29]*linear_map[30];
 				}
 				sub_flatness[i*n_reg_ax+j] = flatness_appearance;
+
 				if(i==0 && j==0)
 				{
 					sub_min = flatness_appearance;
@@ -714,10 +715,12 @@ void my_plugin_run(unsigned char *frame)
 				mv_y = 0.0;
 			}
 
-			waypoints_sub_min.x = stateGetPositionEnu_i()->x + mv_x;
-			waypoints_sub_min.y = stateGetPositionEnu_i()->y + mv_y;
+			float angle = -0.54803;
+
+			waypoints_sub_min.x = stateGetPositionEnu_i()->x + mv_y*cos(angle) + mv_y*sin(angle);
+			waypoints_sub_min.y = stateGetPositionEnu_i()->y - mv_y*sin(angle) + mv_y*cos(angle);
 			waypoints_sub_min.z = stateGetPositionEnu_i()->z;
-//			nav_move_waypoint(WP_P3, &waypoints_sub_min);
+			nav_move_waypoint(WP_P3, &waypoints_sub_min);
 			snapshot = FALSE;
 		}
 #else
